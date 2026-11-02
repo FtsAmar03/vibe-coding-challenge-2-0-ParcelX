@@ -1,17 +1,26 @@
 {
   "name": "vibe_coding_2.o",
   "version": "1.0.0",
-  "description": "",
+  "description": "> A digital desk for a coach in Dumka, Jharkhand. Replaces the worn-out notebook by tracking athlete practice attendance, competitive match sheets, and identifying trial-ready talent for scouts.",
   "license": "ISC",
   "author": "",
   "type": "module",
-
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "parcel index.html",
+    "build": "parcel build index.html"
   },
   "dependencies": {
     "parcel": "^2.16.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FtsAmar03/vibe-coding-challenge-2-0-ParcelX.git"
+  },
+  "keywords": [],
+  "bugs": {
+    "url": "https://github.com/FtsAmar03/vibe-coding-challenge-2-0-ParcelX/issues"
+  },
+  "homepage": "https://github.com/FtsAmar03/vibe-coding-challenge-2-0-ParcelX#readme"
 }

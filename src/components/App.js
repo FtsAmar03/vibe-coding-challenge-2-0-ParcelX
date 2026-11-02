@@ -1,63 +1,153 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 import Header from "./header";
 import Sidebar from "./sidebar";
 import Body from "./body";
 import Footer from "./footer";
 import Players from "./player";
-import { academyData, initialSessionsData, getPlayerAttendanceStats, isPlayerReady } from "./data";
 import Attendance from "./Attendance";
+import Login from "./Login";
+import {
+  api,
+  getToken,
+  getUser,
+  clearSession,
+  adaptPlayer,
+  adaptSession,
+  adaptMatch,
+  historyToSessions,
+  fillSession,
+} from "../api";
 
 function App() {
-  const [sessions, setSessions] = useState(initialSessionsData);
-  const [matches, setMatches] = useState(academyData.matches);
-  const [role, setRole] = useState("coach");
+  const [user, setUser] = useState(() => (getToken() ? getUser() : null));
+  const [players, setPlayers] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [matches, setMatches] = useState([]);
   const [activePage, setActivePage] = useState("dashboard");
-  const [players, setPlayers] = useState(academyData.players);
-  const [selectedPlayerId, setSelectedPlayerId] = useState(1);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
 
-  // Automatically adjust active page when role switches to Scout or Player
+  const role = user ? user.role : null;
+
+  const logout = useCallback(() => {
+    clearSession();
+    setUser(null);
+    setPlayers([]);
+    setSessions([]);
+    setMatches([]);
+    setLoaded(false);
+    setError("");
+  }, []);
+
+  // Land on the right page for each role
   useEffect(() => {
-    if (role === "scout") {
-      setActivePage("ready");
-    } else if (role === "player") {
-      setActivePage("dashboard");
-    }
+    setActivePage(role === "scout" ? "ready" : "dashboard");
   }, [role]);
 
-  // Compute live mathematical attendance on players based on sessions
-  const dynamicPlayers = players.map(p => {
-    const stats = getPlayerAttendanceStats(p.id, p.sport, sessions);
-    const ready = stats.percentage >= 75 && (p.matches || 0) >= 2;
-    return {
-      ...p,
-      attendance: stats.percentage,
-      presentSessions: stats.presentCount,
-      totalSessions: stats.totalHeld,
-      isReady: ready
-    };
-  });
+  // Load data from the backend, depending on who is logged in
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    setError("");
+    try {
+      if (user.role === "coach") {
+        const [p, s, m] = await Promise.all([
+          api.getPlayers(),
+          api.getSessions(),
+          api.getMatches(),
+        ]);
+        setPlayers(p.players.map(adaptPlayer));
+        setSessions(s.map(adaptSession));
+        setMatches(m.map(adaptMatch));
+      } else if (user.role === "scout") {
+        const r = await api.getReadyPlayers();
+        setPlayers(r.players.map(adaptPlayer));
+      } else {
+        const r = await api.getMyRow();
+        setPlayers([adaptPlayer(r.player)]);
+        setSessions(historyToSessions(r.player));
+      }
+      setLoaded(true);
+    } catch (e) {
+      if (e.status === 401) logout();
+      else setError(e.message);
+    }
+  }, [user, logout]);
 
-  // Compute live badges for Sidebar
-  const readyPlayersCount = dynamicPlayers.filter(p => p.isReady).length;
-  const openSessionsCount = sessions.filter(s => s.status === "Open").length;
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  if (!user) {
+    return <Login onLogin={setUser} />;
+  }
+
+  const filledSessions = sessions.map((s) => fillSession(s, players));
 
   const sidebarStats = {
-    totalPlayers: dynamicPlayers.length,
-    readyPlayers: readyPlayersCount,
-    openSessions: openSessionsCount
+    totalPlayers: players.length,
+    readyPlayers: players.filter((p) => p.isReady).length,
+    openSessions: sessions.filter((s) => s.status === "Open").length,
   };
+
+  function renderPage() {
+    if (error) {
+      return (
+        <main className="dashboard">
+          <p style={{ color: "#c0392b" }}>Could not load data: {error}</p>
+          <button className="btn-secondary" onClick={loadData}>
+            Try again
+          </button>
+        </main>
+      );
+    }
+
+    if (!loaded) {
+      return <div className="page-loading">Loading...</div>;
+    }
+
+    if (activePage === "players") {
+      return (
+        <Players
+          players={players}
+          setPlayers={setPlayers}
+          sessions={filledSessions}
+          onNavigateToAttendance={() => setActivePage("attendance")}
+          reload={loadData}
+        />
+      );
+    }
+
+    if (activePage === "attendance") {
+      return (
+        <Attendance
+          players={players}
+          sessions={filledSessions}
+          reload={loadData}
+        />
+      );
+    }
+
+    return (
+      <Body
+        currentRole={role}
+        data={{ players, matches, sessions: filledSessions }}
+        matches={matches}
+        setMatches={setMatches}
+        activePage={activePage}
+        setActivePage={setActivePage}
+        setPlayers={setPlayers}
+        setSessions={setSessions}
+        selectedPlayerId={players[0] ? players[0].id : null}
+        setSelectedPlayerId={() => {}}
+        reload={loadData}
+      />
+    );
+  }
 
   return (
     <div className="app-container">
-      <Header
-        currentRole={role}
-        setRole={setRole}
-        selectedPlayerId={selectedPlayerId}
-        setSelectedPlayerId={setSelectedPlayerId}
-        players={dynamicPlayers}
-      />
+      <Header user={user} onLogout={logout} />
 
       <div className="app-layout">
         <Sidebar
@@ -66,37 +156,7 @@ function App() {
           stats={sidebarStats}
           currentRole={role}
         />
-
-        <div className="page-content">
-          {activePage === "players" ? (
-            <Players
-              players={dynamicPlayers}
-              setPlayers={setPlayers}
-              sessions={sessions}
-              onNavigateToAttendance={() => setActivePage("attendance")}
-            />
-          ) : activePage === "attendance" ? (
-            <Attendance
-              players={dynamicPlayers}
-              sessions={sessions}
-              setSessions={setSessions}
-              setPlayers={setPlayers}
-            />
-          ) : (
-            <Body
-              currentRole={role}
-              data={{ players: dynamicPlayers, matches, sessions }}
-              matches={matches}
-              setMatches={setMatches}
-              activePage={activePage}
-              setActivePage={setActivePage}
-              setPlayers={setPlayers}
-              setSessions={setSessions}
-              selectedPlayerId={selectedPlayerId}
-              setSelectedPlayerId={setSelectedPlayerId}
-            />
-          )}
-        </div>
+        <div className="page-content">{renderPage()}</div>
       </div>
 
       <Footer />
@@ -105,4 +165,3 @@ function App() {
 }
 
 export default App;
-

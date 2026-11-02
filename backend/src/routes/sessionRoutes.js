@@ -1,7 +1,10 @@
 import express from "express";
 import Session from "../models/Session.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import { roleMiddleware } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
+  router.use(authMiddleware, roleMiddleware("coach"));
 
 // GET all sessions
 router.get("/", async (req, res) => {
@@ -18,7 +21,9 @@ router.post("/", async (req, res) => {
   try {
     const { date, sport, notes, attendance } = req.body;
     if (!date || !sport) {
-      return res.status(400).json({ error: "Date and sport are required to open a session." });
+      return res
+        .status(400)
+        .json({ error: "Date and sport are required to open a session." });
     }
 
     const session = new Session({

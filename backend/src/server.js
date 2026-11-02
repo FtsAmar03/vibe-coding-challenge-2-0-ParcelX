@@ -6,6 +6,8 @@ import playerRoutes from "./routes/playerRoutes.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
 import matchRoutes from "./routes/matchRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import { authMiddleware } from "./middleware/authMiddleware.js";
+import { roleMiddleware } from "./middleware/roleMiddleware.js";
 
 const app = express();
 
@@ -15,6 +17,16 @@ app.use(express.json());
 // Connect MongoDB Atlas
 connectDB();
 
+app.get(
+  "/api/coach-dashboard",
+  authMiddleware,
+  roleMiddleware("coach"),
+  (req, res) => {
+    res.json({
+      message: "Welcome to Coach Dashboard",
+    });
+  },
+);
 // Health Check
 app.get("/api/health", (req, res) => {
   res.json({
