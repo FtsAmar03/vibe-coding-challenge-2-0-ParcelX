@@ -1,7 +1,12 @@
-
 import React, { useState } from "react";
+import { api } from "../api";
 
-export default function Players({ players, setPlayers, sessions = [], onNavigateToAttendance }) {
+export default function Players({
+  players,
+  sessions = [],
+  onNavigateToAttendance,
+  reload,
+}) {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [sportFilter, setSportFilter] = useState("All");
@@ -10,7 +15,7 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
   const [newPlayer, setNewPlayer] = useState({
     name: "",
     age: "",
-    sport: "Football"
+    sport: "Football",
   });
 
   const sports = ["Football", "Cricket", "Hockey", "Basketball"];
@@ -18,53 +23,62 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
   // Find latest session for roll call checking (Check 1)
   const latestSession = sessions[0];
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
-    const player = {
-      id: Date.now(),
-      ...newPlayer,
-      age: Number(newPlayer.age),
-      attendance: 0,
-      matches: 0,
-      score: 0
-    };
-
-    setPlayers(prev => [...prev, player]);
+    try {
+      await api.addPlayer({
+        name: newPlayer.name,
+        age: Number(newPlayer.age),
+        sport: newPlayer.sport,
+      });
+      await reload();
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
 
     setNewPlayer({
       name: "",
       age: "",
-      sport: "Football"
+      sport: "Football",
     });
 
     setShowForm(false);
   }
 
-  function confirmDelete() {
-    if (playerToDelete) {
-      setPlayers(prev => prev.filter(player => player.id !== playerToDelete.id));
+  async function confirmDelete() {
+    if (!playerToDelete) return;
+    try {
+      await api.deletePlayer(playerToDelete.id);
+      await reload();
       setPlayerToDelete(null);
+    } catch (err) {
+      alert(err.message);
     }
   }
 
-  const filteredPlayers = players.filter(player => {
+  const filteredPlayers = players.filter((player) => {
     const matchesName = player.name
       .toLowerCase()
       .includes(search.toLowerCase());
 
-    const matchesSport =
-      sportFilter === "All" ||
-      player.sport === sportFilter;
+    const matchesSport = sportFilter === "All" || player.sport === sportFilter;
 
     return matchesName && matchesSport;
   });
 
   // Calculate overview metrics
-  const readyCount = players.filter(p => p.attendance >= 75 && p.matches >= 2).length;
-  const avgAttendance = players.length > 0
-    ? Math.round(players.reduce((sum, p) => sum + (p.attendance || 0), 0) / players.length)
-    : 0;
+  const readyCount = players.filter(
+    (p) => p.attendance >= 75 && p.matches >= 2,
+  ).length;
+  const avgAttendance =
+    players.length > 0
+      ? Math.round(
+          players.reduce((sum, p) => sum + (p.attendance || 0), 0) /
+            players.length,
+        )
+      : 0;
 
   function getInitials(name) {
     if (!name) return "P";
@@ -79,13 +93,12 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
       <div className="page-heading">
         <div>
           <h2>Players Management</h2>
-          <p>Register, track performance criteria, and manage academy athletes.</p>
+          <p>
+            Register, track performance criteria, and manage academy athletes.
+          </p>
         </div>
 
-        <button
-          className="add-player-btn"
-          onClick={() => setShowForm(true)}
-        >
+        <button className="add-player-btn" onClick={() => setShowForm(true)}>
           <span>+</span> Add New Player
         </button>
       </div>
@@ -98,7 +111,10 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
             <span className="metric-icon">👥</span>
           </div>
           <div className="metric-value">{players.length}</div>
-          <p className="metric-subtext">Across {new Set(players.map(p => p.sport)).size} sports disciplines</p>
+          <p className="metric-subtext">
+            Across {new Set(players.map((p) => p.sport)).size} sports
+            disciplines
+          </p>
         </div>
 
         <div className="metric-box accent-box">
@@ -122,9 +138,12 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
 
       {/* Add Player Modal */}
       {showForm && (
-        <div className="player-modal" onClick={(e) => {
-          if (e.target.classList.contains("player-modal")) setShowForm(false);
-        }}>
+        <div
+          className="player-modal"
+          onClick={(e) => {
+            if (e.target.classList.contains("player-modal")) setShowForm(false);
+          }}
+        >
           <form onSubmit={handleSubmit} className="player-form modal-appear">
             <div className="modal-header">
               <h2>Register New Player</h2>
@@ -136,7 +155,9 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
                 ✕
               </button>
             </div>
-            <p className="modal-subtitle">Add a student-athlete to Lawazia Toto Academy desk.</p>
+            <p className="modal-subtitle">
+              Add a student-athlete to Lawazia Toto Academy desk.
+            </p>
 
             <div className="form-group">
               <label>Player Full Name</label>
@@ -144,10 +165,10 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
                 type="text"
                 placeholder="e.g. Samir Murmu"
                 value={newPlayer.name}
-                onChange={e =>
+                onChange={(e) =>
                   setNewPlayer({
                     ...newPlayer,
-                    name: e.target.value
+                    name: e.target.value,
                   })
                 }
                 required
@@ -164,10 +185,10 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
                   max="45"
                   placeholder="e.g. 17"
                   value={newPlayer.age}
-                  onChange={e =>
+                  onChange={(e) =>
                     setNewPlayer({
                       ...newPlayer,
-                      age: e.target.value
+                      age: e.target.value,
                     })
                   }
                   required
@@ -178,14 +199,14 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
                 <label>Primary Sport</label>
                 <select
                   value={newPlayer.sport}
-                  onChange={e =>
+                  onChange={(e) =>
                     setNewPlayer({
                       ...newPlayer,
-                      sport: e.target.value
+                      sport: e.target.value,
                     })
                   }
                 >
-                  {sports.map(sport => (
+                  {sports.map((sport) => (
                     <option key={sport} value={sport}>
                       {sport}
                     </option>
@@ -195,7 +216,11 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
             </div>
 
             <div className="form-actions">
-              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowForm(false)}
+              >
                 Cancel
               </button>
               <button type="submit" className="btn-primary">
@@ -212,7 +237,9 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
           <div className="player-form modal-appear delete-confirm-card">
             <h3>Remove Player?</h3>
             <p>
-              Are you sure you want to remove <strong>{playerToDelete.name}</strong> from the roster? This action cannot be undone.
+              Are you sure you want to remove{" "}
+              <strong>{playerToDelete.name}</strong> from the roster? This
+              action cannot be undone.
             </p>
             <div className="form-actions">
               <button
@@ -242,7 +269,7 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
             type="text"
             placeholder="Search players by name..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
           />
           {search && (
             <button className="clear-search-btn" onClick={() => setSearch("")}>
@@ -255,23 +282,15 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
           <label className="filter-label">SPORT:</label>
           <select
             value={sportFilter}
-            onChange={e => setSportFilter(e.target.value)}
+            onChange={(e) => setSportFilter(e.target.value)}
           >
             <option value="All">All Sports</option>
-            {sports.map(sport => (
+            {sports.map((sport) => (
               <option key={sport} value={sport}>
                 {sport}
               </option>
             ))}
           </select>
-        </div>
-      </div>
-
-      {/* Hackathon Check 1 Banner */}
-      <div className="check-info-banner">
-        <div className="check-badge">CHECK 1 & 3 VERIFIED</div>
-        <div className="check-text">
-          <strong>Daily Practice Roll Call & Attendance Formula:</strong> Three players on roster. Today's practice session has 2 present, 1 absent. Notice <strong>Aman Das shows Absent</strong> on his row with 25% attendance (1/4 sessions). <strong>Rahul & Rohit show Present</strong> with ≥75% attendance and are Match Ready.
         </div>
       </div>
 
@@ -292,21 +311,32 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
           </thead>
 
           <tbody>
-            {filteredPlayers.map(player => {
+            {filteredPlayers.map((player) => {
               const isReady = player.attendance >= 75 && player.matches >= 2;
-              const todayRecord = latestSession?.attendance?.find(r => r.playerId === player.id);
+              const todayRecord = latestSession?.attendance?.find(
+                (r) => r.playerId === player.id,
+              );
               const rollStatus = todayRecord ? todayRecord.status : "Unmarked";
 
               return (
-                <tr key={player.id} className={rollStatus === "Absent" ? "row-absent-highlight" : ""}>
+                <tr
+                  key={player.id}
+                  className={
+                    rollStatus === "Absent" ? "row-absent-highlight" : ""
+                  }
+                >
                   <td>
                     <div className="player-identity-cell">
                       <div className="player-avatar-circle">
                         {getInitials(player.name)}
                       </div>
                       <div>
-                        <strong className="player-full-name">{player.name}</strong>
-                        <span className="player-id-sub">ID: #{player.id.toString().slice(-4)}</span>
+                        <strong className="player-full-name">
+                          {player.name}
+                        </strong>
+                        <span className="player-id-sub">
+                          ID: #{player.id.toString().slice(-4)}
+                        </span>
                       </div>
                     </div>
                   </td>
@@ -316,7 +346,9 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
                   </td>
 
                   <td>
-                    <span className={`sport-tag sport-tag-${player.sport.toLowerCase()}`}>
+                    <span
+                      className={`sport-tag sport-tag-${player.sport.toLowerCase()}`}
+                    >
                       {player.sport}
                     </span>
                   </td>
@@ -342,13 +374,18 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
                       <div className="attendance-progress-track">
                         <div
                           className={`attendance-progress-fill ${player.attendance >= 75 ? "fill-high" : "fill-mid"}`}
-                          style={{ width: `${Math.min(player.attendance || 0, 100)}%` }}
+                          style={{
+                            width: `${Math.min(player.attendance || 0, 100)}%`,
+                          }}
                         ></div>
                       </div>
                       <div className="attendance-ratio-box">
-                        <strong className="attendance-value-text">{player.attendance}%</strong>
+                        <strong className="attendance-value-text">
+                          {player.attendance}%
+                        </strong>
                         <span className="attendance-ratio-sub">
-                          ({player.presentSessions || 0}/{player.totalSessions || 0} sessions)
+                          ({player.presentSessions || 0}/
+                          {player.totalSessions || 0} sessions)
                         </span>
                       </div>
                     </div>
@@ -356,17 +393,24 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
 
                   <td>
                     <span className="matches-count-badge">
-                      ⚽ {player.matches} {player.matches === 1 ? "match" : "matches"}
+                      ⚽ {player.matches}{" "}
+                      {player.matches === 1 ? "match" : "matches"}
                     </span>
                   </td>
 
                   <td>
                     {isReady ? (
-                      <span className="readiness-pill ready-pill" title="≥75% Attendance & ≥2 Matches">
+                      <span
+                        className="readiness-pill ready-pill"
+                        title="≥75% Attendance & ≥2 Matches"
+                      >
                         <span className="pill-dot"></span> ★ Match Ready
                       </span>
                     ) : (
-                      <span className="readiness-pill training-pill" title="Requires ≥75% Attendance and ≥2 Matches">
+                      <span
+                        className="readiness-pill training-pill"
+                        title="Requires ≥75% Attendance and ≥2 Matches"
+                      >
                         <span className="pill-dot"></span> In Training
                       </span>
                     )}
@@ -389,9 +433,12 @@ export default function Players({ players, setPlayers, sessions = [], onNavigate
               <tr>
                 <td colSpan="7">
                   <div className="empty-table-state">
-                    <p className="empty-title">No players found matching your criteria</p>
+                    <p className="empty-title">
+                      No players found matching your criteria
+                    </p>
                     <p className="empty-desc">
-                      Try clearing your search term or register a new player for this sport.
+                      Try clearing your search term or register a new player for
+                      this sport.
                     </p>
                     {search || sportFilter !== "All" ? (
                       <button

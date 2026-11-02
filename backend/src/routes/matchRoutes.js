@@ -1,8 +1,11 @@
 import express from "express";
 import Match from "../models/Match.js";
 import Session from "../models/Session.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import { roleMiddleware } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
+router.use(authMiddleware, roleMiddleware("coach"));
 
 // GET all matches
 router.get("/", async (req, res) => {
@@ -17,10 +20,11 @@ router.get("/", async (req, res) => {
 // POST record match with Absent Player Refusal rule
 router.post("/", async (req, res) => {
   try {
-    const { date, sport, opponent, scores } = req.body;
+    const { date, sport, opponent, venue, result, scores } = req.body;
     if (!date || !sport || !opponent || !scores || !scores.length) {
       return res.status(400).json({
-        error: "Date, sport, opponent, and at least one scored player are required.",
+        error:
+          "Date, sport, opponent, and at least one scored player are required.",
       });
     }
 
@@ -47,6 +51,8 @@ router.post("/", async (req, res) => {
       date,
       sport,
       opponent,
+      venue: venue || "",
+      result: result || "",
       scores,
     });
 

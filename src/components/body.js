@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { api } from "../api";
 
 export default function Body({
   currentRole = "coach",
@@ -10,17 +11,25 @@ export default function Body({
   matches: propMatches,
   setMatches,
   selectedPlayerId = 1,
-  setSelectedPlayerId
+  setSelectedPlayerId,
+  reload,
 }) {
   const players = data.players || [];
   const sessions = data.sessions || [];
   const matches = propMatches || data.matches || [];
 
   // Categorize players by Readiness (Check 3: ≥75% Attendance & ≥2 Matches)
-  const readyPlayers = players.filter(p => p.attendance >= 75 && (p.matches || 0) >= 2);
-  const developingPlayers = players.filter(p => !(p.attendance >= 75 && (p.matches || 0) >= 2));
+  const readyPlayers = players.filter(
+    (p) => p.attendance >= 75 && (p.matches || 0) >= 2,
+  );
+  const developingPlayers = players.filter(
+    (p) => !(p.attendance >= 75 && (p.matches || 0) >= 2),
+  );
 
-  const totalMatchesCount = players.reduce((sum, p) => sum + (p.matches || 0), 0);
+  const totalMatchesCount = players.reduce(
+    (sum, p) => sum + (p.matches || 0),
+    0,
+  );
 
   // Today's date calculations
   const currentDateObj = new Date();
@@ -29,27 +38,31 @@ export default function Body({
     weekday: "long",
     month: "short",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
   });
 
   // Today's session metrics (Check 1)
-  const todaySession = sessions.find(s => s.date === todayDateStr) || sessions[0];
+  const todaySession =
+    sessions.find((s) => s.date === todayDateStr) || sessions[0];
   const presentTodayCount = todaySession
-    ? todaySession.attendance.filter(r => r.status === "Present").length
-    : 2;
+    ? todaySession.attendance.filter((r) => r.status === "Present").length
+    : 0;
   const absentTodayCount = todaySession
-    ? todaySession.attendance.filter(r => r.status === "Absent").length
-    : 1;
-  const scheduledTodayCount = todaySession ? todaySession.attendance.length : players.length;
-  const activeTurnoutRate = scheduledTodayCount > 0
-    ? Math.round((presentTodayCount / scheduledTodayCount) * 100)
-    : 67;
+    ? todaySession.attendance.filter((r) => r.status === "Absent").length
+    : 0;
+  const scheduledTodayCount = todaySession
+    ? todaySession.attendance.length
+    : players.length;
+  const activeTurnoutRate =
+    scheduledTodayCount > 0
+      ? Math.round((presentTodayCount / scheduledTodayCount) * 100)
+      : 0;
 
   // Selected squad drafting state for matches
   const [selectedSquad, setSelectedSquad] = useState([]);
   function togglePlayerSquad(id) {
-    setSelectedSquad(prev =>
-      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+    setSelectedSquad((prev) =>
+      prev.includes(id) ? prev.filter((pId) => pId !== id) : [...prev, id],
     );
   }
 
@@ -67,107 +80,77 @@ export default function Body({
   const [matchSport, setMatchSport] = useState("Football");
   const [matchOpponent, setMatchOpponent] = useState("");
   const [matchVenue, setMatchVenue] = useState("Dumka Stadium");
-  const [matchScoreHome, setMatchScoreHome] = useState("3");
-  const [matchScoreOpponent, setMatchScoreOpponent] = useState("1");
+  const [matchScoreHome, setMatchScoreHome] = useState("0");
+  const [matchScoreOpponent, setMatchScoreOpponent] = useState("0");
   const [matchOutcome, setMatchOutcome] = useState("Won");
-  const [playerScoresInput, setPlayerScoresInput] = useState({
-    1: 2, // Rahul Kumar
-    3: 1  // Rohit Soren
-  });
+  const [playerScoresInput, setPlayerScoresInput] = useState({});
 
   // Find practice session for selected match date & sport (Check 2 Gate)
   const targetSessionForMatch = sessions.find(
-    s => s.date === matchDate && s.sport === matchSport
+    (s) => s.date === matchDate && s.sport === matchSport,
   );
 
   // Handlers for Quick Add Player
-  function handleQuickAddPlayer(e) {
+  async function handleQuickAddPlayer(e) {
     e.preventDefault();
     if (!quickPlayerName.trim()) return;
 
-    const newP = {
-      id: Date.now(),
-      name: quickPlayerName.trim(),
-      age: Number(quickPlayerAge) || 17,
-      sport: quickPlayerSport,
-      matches: 0,
-      score: 0
-    };
-
-    if (setPlayers) {
-      setPlayers(prev => [...prev, newP]);
+    try {
+      await api.addPlayer({
+        name: quickPlayerName.trim(),
+        age: Number(quickPlayerAge) || 17,
+        sport: quickPlayerSport,
+      });
+      await reload();
+    } catch (err) {
+      alert(err.message);
+      return;
     }
+
     setQuickPlayerName("");
     setQuickPlayerAge("");
     setShowQuickAdd(false);
   }
 
   // Handler for Record Match (Check 2: Refuse absent player from scoring sheet)
-  function handleRecordMatchSubmit(e) {
+  async function handleRecordMatchSubmit(e) {
     e.preventDefault();
     if (!matchOpponent.trim()) return;
 
-    const sportPlayers = players.filter(p => p.sport === matchSport);
-    const scoresSheet = [];
-    let updatedPlayerScores = {};
+    // Only players who are not absent that day go on the sheet
+    const scores = players
+      .filter((p) => p.sport === matchSport)
+      .filter((p) => {
+        const rec = targetSessionForMatch?.attendance?.find(
+          (a) => a.playerId === p.id,
+        );
+        if (rec && rec.status === "Absent") return false;
+        return (rec && rec.status === "Present") || !targetSessionForMatch;
+      })
+      .map((p) => ({
+        playerId: p.id,
+        playerName: p.name,
+        score: Number(playerScoresInput[p.id]) || 0,
+      }));
 
-    sportPlayers.forEach(p => {
-      const attRecord = targetSessionForMatch?.attendance?.find(a => a.playerId === p.id);
-      const isAbsent = attRecord && attRecord.status === "Absent";
-      const isPresent = attRecord && attRecord.status === "Present";
-
-      if (isAbsent) {
-        // REFUSED: Absent from practice on match day
-        scoresSheet.push({
-          playerId: p.id,
-          playerName: p.name,
-          score: 0,
-          status: "Refused",
-          reason: "Absent from practice on match day"
-        });
-      } else if (isPresent || !targetSessionForMatch) {
-        // ELIGIBLE: Can have score
-        const scoreVal = Number(playerScoresInput[p.id]) || 0;
-        scoresSheet.push({
-          playerId: p.id,
-          playerName: p.name,
-          score: scoreVal,
-          status: "Scored"
-        });
-        updatedPlayerScores[p.id] = scoreVal;
-      }
-    });
-
-    const newMatch = {
-      id: Date.now(),
-      sport: matchSport,
-      opponent: matchOpponent.trim(),
-      date: matchDate,
-      time: "03:30 PM",
-      venue: matchVenue,
-      status: `${matchOutcome} (${matchScoreHome}-${matchScoreOpponent})`,
-      requiredSquad: 5,
-      scores: scoresSheet
-    };
-
-    if (setMatches) {
-      setMatches(prev => [newMatch, ...prev]);
+    if (scores.length === 0) {
+      alert("No eligible players for this match sheet.");
+      return;
     }
 
-    // Increment matches played and scores for eligible players who participated
-    if (setPlayers) {
-      setPlayers(prevPlayers =>
-        prevPlayers.map(p => {
-          if (updatedPlayerScores[p.id] !== undefined) {
-            return {
-              ...p,
-              matches: (p.matches || 0) + 1,
-              score: (p.score || 0) + updatedPlayerScores[p.id]
-            };
-          }
-          return p;
-        })
-      );
+    try {
+      await api.recordMatch({
+        date: matchDate,
+        sport: matchSport,
+        opponent: matchOpponent.trim(),
+        venue: matchVenue,
+        result: `${matchOutcome} (${matchScoreHome}-${matchScoreOpponent})`,
+        scores,
+      });
+      await reload();
+    } catch (err) {
+      alert(err.message);
+      return;
     }
 
     setMatchOpponent("");
@@ -177,35 +160,40 @@ export default function Body({
   // SVG Chart Calculations for Donut Chart
   const circleRadius = 45;
   const circumference = 2 * Math.PI * circleRadius;
-  const strokeDashoffset = circumference - (activeTurnoutRate / 100) * circumference;
+  const strokeDashoffset =
+    circumference - (activeTurnoutRate / 100) * circumference;
 
   // =========================================================================
   // VIEW A: PLAYER ROLE (Check 4: "Player: Sees only their own row")
   // =========================================================================
   if (currentRole === "player") {
-    const myPlayer = players.find(p => p.id === selectedPlayerId) || players[0];
-    if (!myPlayer) return <div className="page-loading">Loading athlete profile...</div>;
+    const myPlayer =
+      players.find((p) => p.id === selectedPlayerId) || players[0];
+    if (!myPlayer)
+      return <div className="page-loading">Loading athlete profile...</div>;
 
     // Check my player's roll call today
-    const myTodayRecord = todaySession?.attendance?.find(r => r.playerId === myPlayer.id);
+    const myTodayRecord = todaySession?.attendance?.find(
+      (r) => r.playerId === myPlayer.id,
+    );
     const myRollStatus = myTodayRecord ? myTodayRecord.status : "Unmarked";
 
     // Filter sessions to only show this player's personal logs
     const mySessions = sessions
-      .filter(s => s.sport === myPlayer.sport)
-      .map(s => {
-        const myRecord = s.attendance?.find(a => a.playerId === myPlayer.id);
+      .filter((s) => s.sport === myPlayer.sport)
+      .map((s) => {
+        const myRecord = s.attendance?.find((a) => a.playerId === myPlayer.id);
         return {
           id: s.id,
           date: s.date,
           sport: s.sport,
           status: s.status,
-          myStatus: myRecord ? myRecord.status : "Unmarked"
+          myStatus: myRecord ? myRecord.status : "Unmarked",
         };
       });
 
     // Filter matches to only show matches involving this player
-    const myMatches = matches.filter(m => m.sport === myPlayer.sport);
+    const myMatches = matches.filter((m) => m.sport === myPlayer.sport);
 
     return (
       <main className="dashboard player-portal-view">
@@ -213,7 +201,10 @@ export default function Body({
         <div className="check-info-banner player-view-banner">
           <div className="check-badge">CHECK 4: ATHLETE PRIVACY ACTIVE</div>
           <div className="check-text">
-            <strong>Logged in as {myPlayer.name}:</strong> Per hackathon requirements, an athlete login sees <strong>ONLY their own row</strong> and personal attendance/match history. Data of other athletes is strictly restricted.
+            <strong>Logged in as {myPlayer.name}:</strong> Per hackathon
+            requirements, an athlete login sees{" "}
+            <strong>ONLY their own row</strong> and personal attendance/match
+            history. Data of other athletes is strictly restricted.
           </div>
         </div>
 
@@ -225,9 +216,14 @@ export default function Body({
                 {myPlayer.name.slice(0, 2).toUpperCase()}
               </div>
               <div>
-                <span className="live-academy-badge">● LAWAIZA TOTO ATHLETE DESK</span>
+                <span className="live-academy-badge">
+                  ● LAWAIZA TOTO ATHLETE DESK
+                </span>
                 <h2>{myPlayer.name}</h2>
-                <p>Age: {myPlayer.age} · Sport: {myPlayer.sport} · Dumka Academy ID #{myPlayer.id.toString().slice(-4)}</p>
+                <p>
+                  Age: {myPlayer.age} · Sport: {myPlayer.sport} · Dumka Academy
+                  ID #{myPlayer.id.toString().slice(-4)}
+                </p>
               </div>
             </div>
 
@@ -245,7 +241,10 @@ export default function Body({
                   <span className="status-star">⏳</span>
                   <div>
                     <strong>IN DEVELOPMENT ROSTER</strong>
-                    <small>Requires {75 - myPlayer.attendance}% higher attendance to qualify</small>
+                    <small>
+                      Requires {75 - myPlayer.attendance}% higher attendance to
+                      qualify
+                    </small>
                   </div>
                 </div>
               )}
@@ -257,7 +256,9 @@ export default function Body({
         <div className="section-title-row mt-25">
           <div>
             <h3>My Academy Athlete Row (Check 4)</h3>
-            <p>Your official status on the Lawazia Toto Academy master roster.</p>
+            <p>
+              Your official status on the Lawazia Toto Academy master roster.
+            </p>
           </div>
         </div>
 
@@ -275,14 +276,20 @@ export default function Body({
               </tr>
             </thead>
             <tbody>
-              <tr className={myRollStatus === "Absent" ? "row-absent-highlight" : ""}>
+              <tr
+                className={
+                  myRollStatus === "Absent" ? "row-absent-highlight" : ""
+                }
+              >
                 <td>
                   <div className="player-identity-cell">
                     <div className="player-avatar-circle">
                       {myPlayer.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <strong className="player-full-name">{myPlayer.name}</strong>
+                      <strong className="player-full-name">
+                        {myPlayer.name}
+                      </strong>
                       <span className="player-id-sub">Verified Athlete</span>
                     </div>
                   </div>
@@ -291,17 +298,25 @@ export default function Body({
                   <span className="age-badge">{myPlayer.age} yrs</span>
                 </td>
                 <td>
-                  <span className={`sport-tag sport-tag-${myPlayer.sport.toLowerCase()}`}>
+                  <span
+                    className={`sport-tag sport-tag-${myPlayer.sport.toLowerCase()}`}
+                  >
                     {myPlayer.sport}
                   </span>
                 </td>
                 <td>
                   {myRollStatus === "Present" ? (
-                    <span className="roll-call-badge roll-present">✓ Present Today</span>
+                    <span className="roll-call-badge roll-present">
+                      ✓ Present Today
+                    </span>
                   ) : myRollStatus === "Absent" ? (
-                    <span className="roll-call-badge roll-absent">✕ Absent Today</span>
+                    <span className="roll-call-badge roll-absent">
+                      ✕ Absent Today
+                    </span>
                   ) : (
-                    <span className="roll-call-badge roll-unmarked">— Not Marked</span>
+                    <span className="roll-call-badge roll-unmarked">
+                      — Not Marked
+                    </span>
                   )}
                 </td>
                 <td>
@@ -309,25 +324,36 @@ export default function Body({
                     <div className="attendance-progress-track">
                       <div
                         className={`attendance-progress-fill ${myPlayer.attendance >= 75 ? "fill-high" : "fill-mid"}`}
-                        style={{ width: `${Math.min(myPlayer.attendance || 0, 100)}%` }}
+                        style={{
+                          width: `${Math.min(myPlayer.attendance || 0, 100)}%`,
+                        }}
                       ></div>
                     </div>
                     <div className="attendance-ratio-box">
-                      <strong className="attendance-value-text">{myPlayer.attendance}%</strong>
+                      <strong className="attendance-value-text">
+                        {myPlayer.attendance}%
+                      </strong>
                       <span className="attendance-ratio-sub">
-                        ({myPlayer.presentSessions || 0}/{myPlayer.totalSessions || 0} sessions held)
+                        ({myPlayer.presentSessions || 0}/
+                        {myPlayer.totalSessions || 0} sessions held)
                       </span>
                     </div>
                   </div>
                 </td>
                 <td>
-                  <span className="matches-count-badge">⚽ {myPlayer.matches || 0} matches</span>
+                  <span className="matches-count-badge">
+                    ⚽ {myPlayer.matches || 0} matches
+                  </span>
                 </td>
                 <td>
                   {myPlayer.isReady ? (
-                    <span className="readiness-pill ready-pill">★ Match Ready</span>
+                    <span className="readiness-pill ready-pill">
+                      ★ Match Ready
+                    </span>
                   ) : (
-                    <span className="readiness-pill training-pill">In Training</span>
+                    <span className="readiness-pill training-pill">
+                      In Training
+                    </span>
                   )}
                 </td>
               </tr>
@@ -348,17 +374,23 @@ export default function Body({
             </div>
 
             <div className="personal-log-list mt-15">
-              {mySessions.map(s => (
+              {mySessions.map((s) => (
                 <div className="personal-log-item" key={s.id}>
                   <div className="log-date-col">
                     <strong>📅 {s.date}</strong>
-                    <small>{s.sport} Practice ({s.status})</small>
+                    <small>
+                      {s.sport} Practice ({s.status})
+                    </small>
                   </div>
                   <div>
                     {s.myStatus === "Present" ? (
-                      <span className="roll-call-badge roll-present">✓ Present</span>
+                      <span className="roll-call-badge roll-present">
+                        ✓ Present
+                      </span>
                     ) : (
-                      <span className="roll-call-badge roll-absent">✕ Absent</span>
+                      <span className="roll-call-badge roll-absent">
+                        ✕ Absent
+                      </span>
                     )}
                   </div>
                 </div>
@@ -377,14 +409,18 @@ export default function Body({
             </div>
 
             <div className="personal-log-list mt-15">
-              {myMatches.map(m => {
-                const myScoreObj = m.scores?.find(s => s.playerId === myPlayer.id);
+              {myMatches.map((m) => {
+                const myScoreObj = m.scores?.find(
+                  (s) => s.playerId === myPlayer.id,
+                );
 
                 return (
                   <div className="personal-match-item" key={m.id}>
                     <div className="log-date-col">
                       <strong>vs {m.opponent}</strong>
-                      <small>📅 {m.date} · {m.status}</small>
+                      <small>
+                        📅 {m.date} · {m.status}
+                      </small>
                     </div>
 
                     <div>
@@ -394,7 +430,8 @@ export default function Body({
                         </span>
                       ) : myScoreObj?.status === "Scored" ? (
                         <span className="scored-badge">
-                          ⚽ Scored {myScoreObj.score} {myScoreObj.score === 1 ? "Goal" : "Goals"}
+                          ⚽ Scored {myScoreObj.score}{" "}
+                          {myScoreObj.score === 1 ? "Goal" : "Goals"}
                         </span>
                       ) : (
                         <span className="roster-badge">Squad Member</span>
@@ -423,14 +460,20 @@ export default function Body({
         <div className="check-info-banner scout-view-banner">
           <div className="check-badge">CHECK 4: SCOUT FILTER ACTIVE</div>
           <div className="check-text">
-            <strong>Talent Scout Portal:</strong> Per hackathon requirements, the scout sees <strong>ONLY the Ready players</strong>. Athletes under 75% attendance or with less than 2 matches (such as Aman Das) are automatically filtered out.
+            <strong>Talent Scout Portal:</strong> Per hackathon requirements,
+            the scout sees <strong>ONLY the Ready players</strong>. Athletes
+            under 75% attendance or with less than 2 matches are automatically
+            filtered out.
           </div>
         </div>
 
         <div className="page-heading">
           <div>
             <h2>Qualified Match-Ready Talent</h2>
-            <p>Athletes meeting both academy benchmark rules: ≥75% Practice Attendance & ≥2 Verified Competitive Matches.</p>
+            <p>
+              Athletes meeting both academy benchmark rules: ≥75% Practice
+              Attendance & ≥2 Verified Competitive Matches.
+            </p>
           </div>
 
           <div className="readiness-filter-summary">
@@ -446,13 +489,15 @@ export default function Body({
           <div className="benchmark-info">
             <h4>Check 3 Qualification Benchmark Formula</h4>
             <p>
-              Selection threshold: <strong>Attendance = (Present sessions ÷ Sessions held) ≥ 75%</strong>, and <strong>Matches played ≥ 2</strong>. Both Rahul Kumar (75%, 2 matches) and Rohit Soren (100%, 2 matches) meet this rule.
+              Selection threshold:{" "}
+              <strong>
+                Attendance = (Present sessions ÷ Sessions held) ≥ 75%
+              </strong>
+              , and <strong>Matches played ≥ 2</strong>.
             </p>
           </div>
           <div className="benchmark-stat">
-            <span className="benchmark-percent">
-              {readyPlayers.length}
-            </span>
+            <span className="benchmark-percent">{readyPlayers.length}</span>
             <small>READY FOR TRIALS</small>
           </div>
         </div>
@@ -463,13 +508,15 @@ export default function Body({
         </div>
 
         <div className="dashboard-grid">
-          {readyPlayers.map(player => {
+          {readyPlayers.map((player) => {
             const isDrafted = selectedSquad.includes(player.id);
 
             return (
               <div className="card ready-athlete-card" key={player.id}>
                 <div className="card-top-row">
-                  <span className={`sport-tag sport-tag-${player.sport.toLowerCase()}`}>
+                  <span
+                    className={`sport-tag sport-tag-${player.sport.toLowerCase()}`}
+                  >
                     {player.sport}
                   </span>
                   <span className="readiness-pill ready-pill">
@@ -483,15 +530,21 @@ export default function Body({
                   </div>
                   <div>
                     <h3 className="athlete-name">{player.name}</h3>
-                    <p className="athlete-sub">Age: {player.age} · ID #{player.id.toString().slice(-4)}</p>
+                    <p className="athlete-sub">
+                      Age: {player.age} · ID #{player.id.toString().slice(-4)}
+                    </p>
                   </div>
                 </div>
 
                 <div className="athlete-stats-row">
                   <div className="athlete-stat-col">
                     <small>Attendance</small>
-                    <strong className="lime-highlight">{player.attendance}%</strong>
-                    <span className="mini-ratio">({player.presentSessions}/{player.totalSessions})</span>
+                    <strong className="lime-highlight">
+                      {player.attendance}%
+                    </strong>
+                    <span className="mini-ratio">
+                      ({player.presentSessions}/{player.totalSessions})
+                    </span>
                   </div>
                   <div className="athlete-stat-col">
                     <small>Matches</small>
@@ -510,7 +563,9 @@ export default function Body({
                   className={`squad-select-btn ${isDrafted ? "drafted" : ""}`}
                   onClick={() => togglePlayerSquad(player.id)}
                 >
-                  {isDrafted ? "✓ Selected for Trial Invite" : "+ Scout for Tournament Trial"}
+                  {isDrafted
+                    ? "✓ Selected for Trial Invite"
+                    : "+ Scout for Tournament Trial"}
                 </button>
               </div>
             );
@@ -521,14 +576,19 @@ export default function Body({
         {!isStrictScoutRole && developingPlayers.length > 0 && (
           <>
             <div className="section-header-compact mt-35">
-              <h3>In Development · Below 75% Attendance or &lt;2 Matches ({developingPlayers.length})</h3>
+              <h3>
+                In Development · Below 75% Attendance or &lt;2 Matches (
+                {developingPlayers.length})
+              </h3>
             </div>
 
             <div className="dashboard-grid">
-              {developingPlayers.map(player => (
+              {developingPlayers.map((player) => (
                 <div className="card developing-athlete-card" key={player.id}>
                   <div className="card-top-row">
-                    <span className={`sport-tag sport-tag-${player.sport.toLowerCase()}`}>
+                    <span
+                      className={`sport-tag sport-tag-${player.sport.toLowerCase()}`}
+                    >
                       {player.sport}
                     </span>
                     <span className="readiness-pill training-pill">
@@ -542,18 +602,28 @@ export default function Body({
                     </div>
                     <div>
                       <h3 className="athlete-name">{player.name}</h3>
-                      <p className="athlete-sub">Age: {player.age} · ID #{player.id.toString().slice(-4)}</p>
+                      <p className="athlete-sub">
+                        Age: {player.age} · ID #{player.id.toString().slice(-4)}
+                      </p>
                     </div>
                   </div>
 
                   <div className="athlete-gap-box">
-                    <small className="gap-title">Qualification Shortfall:</small>
+                    <small className="gap-title">
+                      Qualification Shortfall:
+                    </small>
                     <ul className="gap-list">
                       {player.attendance < 75 && (
-                        <li>Attendance is {player.attendance}% (Needs at least 75% to qualify)</li>
+                        <li>
+                          Attendance is {player.attendance}% (Needs at least 75%
+                          to qualify)
+                        </li>
                       )}
                       {(player.matches || 0) < 2 && (
-                        <li>Has {player.matches || 0} match (Needs at least 2 matches to qualify)</li>
+                        <li>
+                          Has {player.matches || 0} match (Needs at least 2
+                          matches to qualify)
+                        </li>
                       )}
                     </ul>
                   </div>
@@ -561,8 +631,12 @@ export default function Body({
                   <div className="athlete-stats-row">
                     <div className="athlete-stat-col">
                       <small>Attendance</small>
-                      <strong className="text-secondary">{player.attendance}%</strong>
-                      <span className="mini-ratio">({player.presentSessions}/{player.totalSessions})</span>
+                      <strong className="text-secondary">
+                        {player.attendance}%
+                      </strong>
+                      <span className="mini-ratio">
+                        ({player.presentSessions}/{player.totalSessions})
+                      </span>
                     </div>
                     <div className="athlete-stat-col">
                       <small>Matches</small>
@@ -592,14 +666,22 @@ export default function Body({
         <div className="check-info-banner match-check-banner">
           <div className="check-badge">CHECK 2 ENFORCED</div>
           <div className="check-text">
-            <strong>Matchday Attendance Rule:</strong> A match on the same day scores the players who were present in practice. <strong>A player absent from practice that day is refused from the match sheet.</strong>
+            <strong>Matchday Attendance Rule:</strong> A match on the same day
+            scores the players who were present in practice.{" "}
+            <strong>
+              A player absent from practice that day is refused from the match
+              sheet.
+            </strong>
           </div>
         </div>
 
         <div className="page-heading">
           <div>
             <h2>Match Schedule & Verified Sheets</h2>
-            <p>Lawazia Toto Academy competitive fixtures, scores, and practice attendance verification.</p>
+            <p>
+              Lawazia Toto Academy competitive fixtures, scores, and practice
+              attendance verification.
+            </p>
           </div>
 
           <button
@@ -612,11 +694,21 @@ export default function Body({
 
         {/* Fixtures & Results List */}
         <div className="matches-grid">
-          {matches.map(m => (
+          {matches.map((m) => (
             <div className="card match-fixture-card" key={m.id}>
               <div className="match-card-top">
-                <span className={`sport-tag sport-tag-${m.sport.toLowerCase()}`}>{m.sport}</span>
-                <span className={m.status.includes("Won") ? "match-status-won" : "match-status-upcoming"}>
+                <span
+                  className={`sport-tag sport-tag-${m.sport.toLowerCase()}`}
+                >
+                  {m.sport}
+                </span>
+                <span
+                  className={
+                    m.status.includes("Won")
+                      ? "match-status-won"
+                      : "match-status-upcoming"
+                  }
+                >
                   {m.status}
                 </span>
               </div>
@@ -640,7 +732,9 @@ export default function Body({
               <div className="match-meta-box">
                 <div className="meta-item">
                   <span className="meta-icon">📅</span>
-                  <span>{m.date} at {m.time}</span>
+                  <span>
+                    {m.date} at {m.time}
+                  </span>
                 </div>
                 <div className="meta-item">
                   <span className="meta-icon">📍</span>
@@ -656,7 +750,7 @@ export default function Body({
                   </div>
 
                   <div className="scoresheet-players">
-                    {m.scores.map(s => (
+                    {m.scores.map((s) => (
                       <div
                         key={s.playerId}
                         className={`scoresheet-row ${s.status === "Refused" ? "refused-row" : "scored-row"}`}
@@ -664,15 +758,21 @@ export default function Body({
                         <div className="scoresheet-player-name">
                           <strong>{s.playerName}</strong>
                           {s.status === "Refused" && (
-                            <small className="refusal-reason">Absent from practice on match day</small>
+                            <small className="refusal-reason">
+                              Absent from practice on match day
+                            </small>
                           )}
                         </div>
 
                         <div>
                           {s.status === "Refused" ? (
-                            <span className="refused-badge">⛔ REFUSED FROM SHEET</span>
+                            <span className="refused-badge">
+                              ⛔ REFUSED FROM SHEET
+                            </span>
                           ) : (
-                            <span className="scored-badge">⚽ {s.score} {s.score === 1 ? "Goal" : "Goals"}</span>
+                            <span className="scored-badge">
+                              ⚽ {s.score} {s.score === 1 ? "Goal" : "Goals"}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -696,72 +796,20 @@ export default function Body({
   return (
     <main className="dashboard coach-dashboard">
       {/* =================================================================
-          0. HACKATHON ACCEPTANCE CHECKS 1-4 VERIFICATION BAR
-          ================================================================= */}
-      <div className="hackathon-checks-bar card">
-        <div className="checks-bar-header">
-          <div className="checks-title-group">
-            <span className="check-badge-pill">HACKATHON VERIFICATION</span>
-            <h3>Dumka Academy Desk Acceptance Checks</h3>
-          </div>
-          <span className="all-pass-tag">✓ ALL 4 CHECKS READY</span>
-        </div>
-
-        <div className="checks-grid">
-          <div className="check-step-card" onClick={() => setActivePage && setActivePage("players")}>
-            <div className="check-step-top">
-              <span className="check-step-num">CHECK 1</span>
-              <span className="check-status-pass">PASS</span>
-            </div>
-            <strong>Session Roll Call</strong>
-            <p>3 players. Today's session: 2 Present (Rahul, Rohit), 1 Absent (Aman shows absent on his row).</p>
-            <span className="check-link-text">Inspect Players Table →</span>
-          </div>
-
-          <div className="check-step-card" onClick={() => setActivePage && setActivePage("matches")}>
-            <div className="check-step-top">
-              <span className="check-step-num">CHECK 2</span>
-              <span className="check-status-pass">PASS</span>
-            </div>
-            <strong>Match Sheet Refusal</strong>
-            <p>Match on same day scores the 2 present. The absent player (Aman) is refused from the sheet.</p>
-            <span className="check-link-text">Inspect Match Sheet →</span>
-          </div>
-
-          <div className="check-step-card" onClick={() => setActivePage && setActivePage("ready")}>
-            <div className="check-step-top">
-              <span className="check-step-num">CHECK 3</span>
-              <span className="check-status-pass">PASS</span>
-            </div>
-            <strong>Attendance Formula</strong>
-            <p>Present ÷ Held. Aman (25%) is NOT Ready. Rahul (75% + 2 matches) & Rohit (100% + 2 matches) are Ready.</p>
-            <span className="check-link-text">Inspect Formula & Lineup →</span>
-          </div>
-
-          <div className="check-step-card">
-            <div className="check-step-top">
-              <span className="check-step-num">CHECK 4</span>
-              <span className="check-status-pass">PASS</span>
-            </div>
-            <strong>Scout & Player Role Views</strong>
-            <p>Scout sees only Ready players. Player login sees only their own row. Switch role in top header.</p>
-            <span className="check-link-text">Use Role Dropdown in Header ↑</span>
-          </div>
-        </div>
-      </div>
-
-      {/* =================================================================
           1. WELCOME SECTION
           ================================================================= */}
       <div className="coach-welcome-banner mt-25">
         <div className="welcome-text-block">
           <div className="welcome-badge-row">
             <span className="live-academy-badge">● DUMKA ACADEMY DESK</span>
-            <span className="current-date-badge">📅 {formattedCurrentDate}</span>
+            <span className="current-date-badge">
+              📅 {formattedCurrentDate}
+            </span>
           </div>
           <h1>Good morning, Coach!</h1>
           <p>
-            Here is your daily athletic summary, squad attendance turnout, and match readiness overview.
+            Here is your daily athletic summary, squad attendance turnout, and
+            match readiness overview.
           </p>
         </div>
 
@@ -798,7 +846,10 @@ export default function Body({
           ================================================================= */}
       <div className="dashboard-grid four-stats-grid">
         {/* Stat 1: Total Players */}
-        <div className="card kpi-card" onClick={() => setActivePage && setActivePage("players")}>
+        <div
+          className="card kpi-card"
+          onClick={() => setActivePage && setActivePage("players")}
+        >
           <div className="kpi-header">
             <h3>TOTAL PLAYERS</h3>
             <span className="kpi-icon">👥</span>
@@ -807,28 +858,35 @@ export default function Body({
             <h1>{players.length}</h1>
             <span className="kpi-trend-tag positive">Check 1 Squad</span>
           </div>
-          <p>
-            Rahul Kumar, Aman Das, Rohit Soren registered in <strong>Football</strong>.
-          </p>
+          <p>Athletes registered in the academy.</p>
         </div>
 
         {/* Stat 2: Present Today */}
-        <div className="card kpi-card accent-border-card" onClick={() => setActivePage && setActivePage("attendance")}>
+        <div
+          className="card kpi-card accent-border-card"
+          onClick={() => setActivePage && setActivePage("attendance")}
+        >
           <div className="kpi-header">
             <h3>PRESENT TODAY</h3>
             <span className="kpi-icon">✓</span>
           </div>
           <div className="kpi-value-row">
             <h1 className="emerald-text">{presentTodayCount}</h1>
-            <span className="kpi-status-tag">{todaySession ? todaySession.status.toUpperCase() : "LOCKED"}</span>
+            <span className="kpi-status-tag">
+              {todaySession ? todaySession.status.toUpperCase() : "LOCKED"}
+            </span>
           </div>
           <p>
-            <strong>2 Present</strong>, <strong>1 Absent</strong> (Aman Das) on session sheet.
+            <strong>{presentTodayCount} Present</strong>,{" "}
+            <strong>{absentTodayCount} Absent</strong> on the latest session.
           </p>
         </div>
 
         {/* Stat 3: Total Matches */}
-        <div className="card kpi-card" onClick={() => setActivePage && setActivePage("matches")}>
+        <div
+          className="card kpi-card"
+          onClick={() => setActivePage && setActivePage("matches")}
+        >
           <div className="kpi-header">
             <h3>TOTAL MATCHES</h3>
             <span className="kpi-icon">⚽</span>
@@ -838,12 +896,16 @@ export default function Body({
             <span className="kpi-trend-tag">Active Season</span>
           </div>
           <p>
-            Verified competition fixtures across <strong>all tournament squads</strong>.
+            Verified competition fixtures across{" "}
+            <strong>all tournament squads</strong>.
           </p>
         </div>
 
         {/* Stat 4: Ready Players */}
-        <div className="card kpi-card highlight-card" onClick={() => setActivePage && setActivePage("ready")}>
+        <div
+          className="card kpi-card highlight-card"
+          onClick={() => setActivePage && setActivePage("ready")}
+        >
           <div className="kpi-header">
             <h3>READY PLAYERS</h3>
             <span className="kpi-icon">★</span>
@@ -865,11 +927,16 @@ export default function Body({
         <div className="overview-card-header">
           <div>
             <h3>Squad Attendance Overview</h3>
-            <p>Daily practice attendance breakdown and progress toward tournament threshold.</p>
+            <p>
+              Daily practice attendance breakdown and progress toward tournament
+              threshold.
+            </p>
           </div>
 
           <div className="overview-header-actions">
-            <span className="session-date-pill">Session: {todaySession ? todaySession.date : todayDateStr}</span>
+            <span className="session-date-pill">
+              Session: {todaySession ? todaySession.date : todayDateStr}
+            </span>
             {setActivePage && (
               <button
                 className="secondary-link-btn"
@@ -885,7 +952,12 @@ export default function Body({
           {/* Circular Donut Progress Chart */}
           <div className="chart-wrapper-box">
             <div className="donut-chart-container">
-              <svg className="circular-chart-svg" viewBox="0 0 120 120" width="130" height="130">
+              <svg
+                className="circular-chart-svg"
+                viewBox="0 0 120 120"
+                width="130"
+                height="130"
+              >
                 <circle
                   cx="60"
                   cy="60"
@@ -918,15 +990,21 @@ export default function Body({
             <div className="chart-legend-box">
               <div className="legend-item">
                 <span className="legend-dot dot-present"></span>
-                <span>Present: <strong>{presentTodayCount} athletes</strong></span>
+                <span>
+                  Present: <strong>{presentTodayCount} athletes</strong>
+                </span>
               </div>
               <div className="legend-item">
                 <span className="legend-dot dot-absent"></span>
-                <span>Absent: <strong>{absentTodayCount} athlete</strong> (Aman Das)</span>
+                <span>
+                  Absent: <strong>{absentTodayCount} athletes</strong>
+                </span>
               </div>
               <div className="legend-item">
                 <span className="legend-dot dot-threshold"></span>
-                <span>Ready Benchmark: <strong>75%</strong></span>
+                <span>
+                  Ready Benchmark: <strong>75%</strong>
+                </span>
               </div>
             </div>
           </div>
@@ -937,26 +1015,38 @@ export default function Body({
               <span className="pill-metric-label">ATTENDANCE RATE</span>
               <span className="pill-metric-value">{activeTurnoutRate}%</span>
               <small className="pill-metric-sub">
-                {activeTurnoutRate >= 75 ? "✓ Above qualification mark" : "2 of 3 players present today"}
+                {activeTurnoutRate >= 75
+                  ? "✓ Above qualification mark"
+                  : `${presentTodayCount} of ${scheduledTodayCount} players present`}
               </small>
             </div>
 
             <div className="metric-pill-item">
               <span className="pill-metric-label">PRESENT PLAYERS</span>
-              <span className="pill-metric-value emerald-text">{presentTodayCount}</span>
-              <small className="pill-metric-sub">Rahul Kumar, Rohit Soren</small>
+              <span className="pill-metric-value emerald-text">
+                {presentTodayCount}
+              </span>
+              <small className="pill-metric-sub">
+                Marked present in the latest session
+              </small>
             </div>
 
             <div className="metric-pill-item">
               <span className="pill-metric-label">ABSENT PLAYERS</span>
-              <span className="pill-metric-value coral-text">{absentTodayCount}</span>
-              <small className="pill-metric-sub">Aman Das (Refused from match)</small>
+              <span className="pill-metric-value coral-text">
+                {absentTodayCount}
+              </span>
+              <small className="pill-metric-sub">
+                Marked absent in the latest session
+              </small>
             </div>
           </div>
 
           {/* Sport Discipline Turnout Bars */}
           <div className="discipline-turnout-bars">
-            <span className="discipline-title">Turnout by Sport Discipline</span>
+            <span className="discipline-title">
+              Turnout by Sport Discipline
+            </span>
 
             <div className="discipline-bar-row">
               <div className="discipline-bar-labels">
@@ -964,27 +1054,10 @@ export default function Body({
                 <strong>{activeTurnoutRate}%</strong>
               </div>
               <div className="discipline-track">
-                <div className="discipline-fill fill-football" style={{ width: `${activeTurnoutRate}%` }}></div>
-              </div>
-            </div>
-
-            <div className="discipline-bar-row">
-              <div className="discipline-bar-labels">
-                <span>🏏 Cricket Squad</span>
-                <strong>80%</strong>
-              </div>
-              <div className="discipline-track">
-                <div className="discipline-fill fill-cricket" style={{ width: "80%" }}></div>
-              </div>
-            </div>
-
-            <div className="discipline-bar-row">
-              <div className="discipline-bar-labels">
-                <span>🏑 Hockey Squad</span>
-                <strong>70%</strong>
-              </div>
-              <div className="discipline-track">
-                <div className="discipline-fill fill-hockey" style={{ width: "70%" }}></div>
+                <div
+                  className="discipline-fill fill-football"
+                  style={{ width: `${activeTurnoutRate}%` }}
+                ></div>
               </div>
             </div>
           </div>
@@ -997,7 +1070,10 @@ export default function Body({
       <div className="section-title-row mt-35">
         <div>
           <h2>Recent Academy Activity</h2>
-          <p>Real-time logs of newly registered players, daily roll calls, and match results.</p>
+          <p>
+            Real-time logs of newly registered players, daily roll calls, and
+            match results.
+          </p>
         </div>
       </div>
 
@@ -1013,20 +1089,27 @@ export default function Body({
           </div>
 
           <div className="activity-list">
-            {players.slice(-3).reverse().map(p => (
-              <div className="activity-item" key={p.id}>
-                <div className="activity-avatar">
-                  {p.name.slice(0, 2).toUpperCase()}
+            {players
+              .slice(-3)
+              .reverse()
+              .map((p) => (
+                <div className="activity-item" key={p.id}>
+                  <div className="activity-avatar">
+                    {p.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="activity-info">
+                    <strong>{p.name}</strong>
+                    <small>
+                      Age {p.age} · {p.sport}
+                    </small>
+                  </div>
+                  <span
+                    className={`sport-tag sport-tag-${p.sport.toLowerCase()}`}
+                  >
+                    {p.sport}
+                  </span>
                 </div>
-                <div className="activity-info">
-                  <strong>{p.name}</strong>
-                  <small>Age {p.age} · {p.sport}</small>
-                </div>
-                <span className={`sport-tag sport-tag-${p.sport.toLowerCase()}`}>
-                  {p.sport}
-                </span>
-              </div>
-            ))}
+              ))}
           </div>
 
           <div className="activity-card-footer">
@@ -1050,20 +1133,26 @@ export default function Body({
           </div>
 
           <div className="activity-list">
-            {sessions.slice(0, 3).map(s => {
-              const pCount = s.attendance.filter(r => r.status === "Present").length;
+            {sessions.slice(0, 3).map((s) => {
+              const pCount = s.attendance.filter(
+                (r) => r.status === "Present",
+              ).length;
               const tCount = s.attendance.length;
 
               return (
                 <div className="activity-item" key={s.id}>
-                  <div className="activity-session-icon">
-                    ⚽
-                  </div>
+                  <div className="activity-session-icon">⚽</div>
                   <div className="activity-info">
                     <strong>{s.sport} Practice</strong>
-                    <small>📅 {s.date} · {pCount}/{tCount} Present</small>
+                    <small>
+                      📅 {s.date} · {pCount}/{tCount} Present
+                    </small>
                   </div>
-                  <span className={s.status === "Closed" ? "closed-tag" : "open-tag"}>
+                  <span
+                    className={
+                      s.status === "Closed" ? "closed-tag" : "open-tag"
+                    }
+                  >
                     {s.status === "Closed" ? "LOCKED" : "OPEN"}
                   </span>
                 </div>
@@ -1092,16 +1181,22 @@ export default function Body({
           </div>
 
           <div className="activity-list">
-            {matches.slice(0, 2).map(m => (
+            {matches.slice(0, 2).map((m) => (
               <div className="activity-item match-activity-item" key={m.id}>
-                <div className="match-icon-circle">
-                  ⚽
-                </div>
+                <div className="match-icon-circle">⚽</div>
                 <div className="activity-info">
                   <strong>vs {m.opponent}</strong>
-                  <small>📍 {m.venue} · {m.date}</small>
+                  <small>
+                    📍 {m.venue} · {m.date}
+                  </small>
                 </div>
-                <span className={m.status.includes("Won") ? "match-status-won" : "match-status-upcoming"}>
+                <span
+                  className={
+                    m.status.includes("Won")
+                      ? "match-status-won"
+                      : "match-status-upcoming"
+                  }
+                >
                   {m.status}
                 </span>
               </div>
@@ -1125,7 +1220,10 @@ export default function Body({
       <div className="section-title-row mt-35">
         <div>
           <h2>Ready Players Preview (Check 3 Verified)</h2>
-          <p>Athletes meeting both selection criteria: ≥75% Attendance and ≥2 Competitive Matches.</p>
+          <p>
+            Athletes meeting both selection criteria: ≥75% Attendance and ≥2
+            Competitive Matches.
+          </p>
         </div>
 
         {setActivePage && (
@@ -1153,7 +1251,7 @@ export default function Body({
             </thead>
 
             <tbody>
-              {readyPlayers.map(player => (
+              {readyPlayers.map((player) => (
                 <tr key={player.id}>
                   <td>
                     <div className="player-identity-cell">
@@ -1161,14 +1259,21 @@ export default function Body({
                         {player.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <strong className="player-full-name">{player.name}</strong>
-                        <span className="player-id-sub">Age: {player.age} · ID #{player.id.toString().slice(-4)}</span>
+                        <strong className="player-full-name">
+                          {player.name}
+                        </strong>
+                        <span className="player-id-sub">
+                          Age: {player.age} · ID #
+                          {player.id.toString().slice(-4)}
+                        </span>
                       </div>
                     </div>
                   </td>
 
                   <td>
-                    <span className={`sport-tag sport-tag-${player.sport.toLowerCase()}`}>
+                    <span
+                      className={`sport-tag sport-tag-${player.sport.toLowerCase()}`}
+                    >
                       {player.sport}
                     </span>
                   </td>
@@ -1178,13 +1283,18 @@ export default function Body({
                       <div className="attendance-progress-track">
                         <div
                           className="attendance-progress-fill fill-high"
-                          style={{ width: `${Math.min(player.attendance || 0, 100)}%` }}
+                          style={{
+                            width: `${Math.min(player.attendance || 0, 100)}%`,
+                          }}
                         ></div>
                       </div>
                       <div className="attendance-ratio-box">
-                        <strong className="attendance-value-text">{player.attendance}%</strong>
+                        <strong className="attendance-value-text">
+                          {player.attendance}%
+                        </strong>
                         <span className="attendance-ratio-sub">
-                          ({player.presentSessions || 0}/{player.totalSessions || 0} sessions)
+                          ({player.presentSessions || 0}/
+                          {player.totalSessions || 0} sessions)
                         </span>
                       </div>
                     </div>
@@ -1192,7 +1302,8 @@ export default function Body({
 
                   <td>
                     <span className="matches-count-badge">
-                      ⚽ {player.matches} {player.matches === 1 ? "match" : "matches"}
+                      ⚽ {player.matches}{" "}
+                      {player.matches === 1 ? "match" : "matches"}
                     </span>
                   </td>
 
@@ -1219,10 +1330,17 @@ export default function Body({
 
       {/* Quick Add Player Modal */}
       {showQuickAdd && (
-        <div className="player-modal" onClick={(e) => {
-          if (e.target.classList.contains("player-modal")) setShowQuickAdd(false);
-        }}>
-          <form onSubmit={handleQuickAddPlayer} className="player-form modal-appear">
+        <div
+          className="player-modal"
+          onClick={(e) => {
+            if (e.target.classList.contains("player-modal"))
+              setShowQuickAdd(false);
+          }}
+        >
+          <form
+            onSubmit={handleQuickAddPlayer}
+            className="player-form modal-appear"
+          >
             <div className="modal-header">
               <h2>Quick Register Athlete</h2>
               <button
@@ -1233,7 +1351,9 @@ export default function Body({
                 ✕
               </button>
             </div>
-            <p className="modal-subtitle">Enroll an athlete directly to the academy roster.</p>
+            <p className="modal-subtitle">
+              Enroll an athlete directly to the academy roster.
+            </p>
 
             <div className="form-group">
               <label>Player Full Name</label>
@@ -1241,7 +1361,7 @@ export default function Body({
                 type="text"
                 placeholder="e.g. Ramesh Hansda"
                 value={quickPlayerName}
-                onChange={e => setQuickPlayerName(e.target.value)}
+                onChange={(e) => setQuickPlayerName(e.target.value)}
                 required
                 autoFocus
               />
@@ -1256,7 +1376,7 @@ export default function Body({
                   max="45"
                   placeholder="e.g. 17"
                   value={quickPlayerAge}
-                  onChange={e => setQuickPlayerAge(e.target.value)}
+                  onChange={(e) => setQuickPlayerAge(e.target.value)}
                   required
                 />
               </div>
@@ -1265,7 +1385,7 @@ export default function Body({
                 <label>Primary Sport</label>
                 <select
                   value={quickPlayerSport}
-                  onChange={e => setQuickPlayerSport(e.target.value)}
+                  onChange={(e) => setQuickPlayerSport(e.target.value)}
                 >
                   <option value="Football">Football</option>
                   <option value="Cricket">Cricket</option>
@@ -1300,13 +1420,20 @@ export default function Body({
   // HELPER: RENDER RECORD MATCH MODAL (WITH CHECK 2 REFUSAL GATE)
   // =========================================================================
   function renderRecordMatchModal() {
-    const sportPlayers = players.filter(p => p.sport === matchSport);
+    const sportPlayers = players.filter((p) => p.sport === matchSport);
 
     return (
-      <div className="player-modal" onClick={(e) => {
-        if (e.target.classList.contains("player-modal")) setShowRecordMatch(false);
-      }}>
-        <form onSubmit={handleRecordMatchSubmit} className="player-form modal-appear match-record-form">
+      <div
+        className="player-modal"
+        onClick={(e) => {
+          if (e.target.classList.contains("player-modal"))
+            setShowRecordMatch(false);
+        }}
+      >
+        <form
+          onSubmit={handleRecordMatchSubmit}
+          className="player-form modal-appear match-record-form"
+        >
           <div className="modal-header">
             <h2>Record Match & Player Scores</h2>
             <button
@@ -1318,7 +1445,9 @@ export default function Body({
             </button>
           </div>
           <p className="modal-subtitle">
-            Log inter-district match results. <strong>Check 2 enforced:</strong> players absent from practice on this match day are automatically refused from the scoring sheet.
+            Log inter-district match results. <strong>Check 2 enforced:</strong>{" "}
+            players absent from practice on this match day are automatically
+            refused from the scoring sheet.
           </p>
 
           <div className="form-row">
@@ -1327,7 +1456,7 @@ export default function Body({
               <input
                 type="date"
                 value={matchDate}
-                onChange={e => setMatchDate(e.target.value)}
+                onChange={(e) => setMatchDate(e.target.value)}
                 required
               />
             </div>
@@ -1336,7 +1465,7 @@ export default function Body({
               <label>Sport</label>
               <select
                 value={matchSport}
-                onChange={e => setMatchSport(e.target.value)}
+                onChange={(e) => setMatchSport(e.target.value)}
               >
                 <option value="Football">Football</option>
                 <option value="Cricket">Cricket</option>
@@ -1352,7 +1481,7 @@ export default function Body({
                 type="text"
                 placeholder="e.g. Ranchi Youth FC"
                 value={matchOpponent}
-                onChange={e => setMatchOpponent(e.target.value)}
+                onChange={(e) => setMatchOpponent(e.target.value)}
                 required
               />
             </div>
@@ -1361,7 +1490,7 @@ export default function Body({
               <label>Match Outcome</label>
               <select
                 value={matchOutcome}
-                onChange={e => setMatchOutcome(e.target.value)}
+                onChange={(e) => setMatchOutcome(e.target.value)}
               >
                 <option value="Won">Won</option>
                 <option value="Drawn">Drawn</option>
@@ -1377,7 +1506,7 @@ export default function Body({
                 type="number"
                 min="0"
                 value={matchScoreHome}
-                onChange={e => setMatchScoreHome(e.target.value)}
+                onChange={(e) => setMatchScoreHome(e.target.value)}
                 required
               />
             </div>
@@ -1388,7 +1517,7 @@ export default function Body({
                 type="number"
                 min="0"
                 value={matchScoreOpponent}
-                onChange={e => setMatchScoreOpponent(e.target.value)}
+                onChange={(e) => setMatchScoreOpponent(e.target.value)}
                 required
               />
             </div>
@@ -1406,8 +1535,10 @@ export default function Body({
             </div>
 
             <div className="gate-players-list">
-              {sportPlayers.map(p => {
-                const attRecord = targetSessionForMatch?.attendance?.find(a => a.playerId === p.id);
+              {sportPlayers.map((p) => {
+                const attRecord = targetSessionForMatch?.attendance?.find(
+                  (a) => a.playerId === p.id,
+                );
                 const isAbsent = attRecord && attRecord.status === "Absent";
                 const isPresent = attRecord && attRecord.status === "Present";
 
@@ -1437,7 +1568,9 @@ export default function Body({
 
                     <div className="gate-player-right">
                       {isAbsent ? (
-                        <span className="disabled-score-notice">Not on sheet</span>
+                        <span className="disabled-score-notice">
+                          Not on sheet
+                        </span>
                       ) : (
                         <div className="score-input-wrap">
                           <label>Goals / Score:</label>
@@ -1445,11 +1578,15 @@ export default function Body({
                             type="number"
                             min="0"
                             max="20"
-                            value={playerScoresInput[p.id] !== undefined ? playerScoresInput[p.id] : 0}
-                            onChange={e =>
+                            value={
+                              playerScoresInput[p.id] !== undefined
+                                ? playerScoresInput[p.id]
+                                : 0
+                            }
+                            onChange={(e) =>
                               setPlayerScoresInput({
                                 ...playerScoresInput,
-                                [p.id]: Number(e.target.value)
+                                [p.id]: Number(e.target.value),
                               })
                             }
                           />

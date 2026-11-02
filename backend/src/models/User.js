@@ -23,7 +23,14 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      default: "coach",
+      enum: ["coach", "scout", "player"],
+      default: "player",
+    },
+
+    playerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Player",
+      default: null,
     },
   },
   { timestamps: true },

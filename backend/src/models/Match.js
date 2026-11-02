@@ -38,6 +38,14 @@ const matchSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    venue: {
+      type: String,
+      default: "",
+    },
+    result: {
+      type: String,
+      default: "",
+    },
     scores: [scoreSchema],
   },
   {
