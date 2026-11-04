@@ -58,6 +58,100 @@ export const registerCoach = async (req, res) => {
   }
 };
 
+// Public sign up for coach, scout and player
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const signup = async (req, res) => {
+  try {
+    const { name, email, password, role, age, sport } = req.body;
+
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({
+        message: "Name, email, password and role are required",
+      });
+    }
+
+    if (!["coach", "scout", "player"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters",
+      });
+    }
+
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(409).json({ message: "Email already exists" });
+    }
+
+    // Only one coach and one scout can sign up
+    if (role === "coach" || role === "scout") {
+      const existingRole = await User.findOne({ role });
+      if (existingRole) {
+        return res.status(403).json({
+          message: `${role === "coach" ? "Coach" : "Scout"} account is already registered`,
+        });
+      }
+    }
+
+    // A player must already be on the roster the coach built
+    let playerId = null;
+    if (role === "player") {
+      if (!age || !sport) {
+        return res.status(400).json({
+          message: "Age and sport are required for a player sign up",
+        });
+      }
+
+      const linkedIds = await User.find({
+        role: "player",
+        playerId: { $ne: null },
+      }).distinct("playerId");
+
+      const player = await Player.findOne({
+        name: new RegExp(`^${escapeRegex(name.trim())}$`, "i"),
+        sport: new RegExp(`^${escapeRegex(String(sport).trim())}$`, "i"),
+        age: Number(age),
+        _id: { $nin: linkedIds },
+      });
+
+      if (!player) {
+        return res.status(404).json({
+          message:
+            "No matching player found. Ask your coach to add you first, and use the same name, age and sport. If you already signed up, just log in.",
+        });
+      }
+
+      playerId = player._id;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name: name.trim(),
+      email,
+      password: hashedPassword,
+      role,
+      playerId,
+    });
+
+    res.status(201).json({
+      message: "Account created successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        playerId: user.playerId,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Coach creates a scout or player login
 export const createUser = async (req, res) => {
   try {

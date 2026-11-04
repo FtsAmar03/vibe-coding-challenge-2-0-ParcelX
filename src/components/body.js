@@ -1,6 +1,15 @@
 import React, { useState } from "react";
 import { api } from "../api";
 
+// Won / Drawn / Lost is worked out from the two scores
+function outcomeFromScore(home, away) {
+  const h = Number(home) || 0;
+  const a = Number(away) || 0;
+  if (h > a) return "Won";
+  if (h < a) return "Lost";
+  return "Drawn";
+}
+
 export default function Body({
   currentRole = "coach",
   data = {},
@@ -82,7 +91,6 @@ export default function Body({
   const [matchVenue, setMatchVenue] = useState("Dumka Stadium");
   const [matchScoreHome, setMatchScoreHome] = useState("0");
   const [matchScoreOpponent, setMatchScoreOpponent] = useState("0");
-  const [matchOutcome, setMatchOutcome] = useState("Won");
   const [playerScoresInput, setPlayerScoresInput] = useState({});
 
   // Find practice session for selected match date & sport (Check 2 Gate)
@@ -144,7 +152,7 @@ export default function Body({
         sport: matchSport,
         opponent: matchOpponent.trim(),
         venue: matchVenue,
-        result: `${matchOutcome} (${matchScoreHome}-${matchScoreOpponent})`,
+        result: `${outcomeFromScore(matchScoreHome, matchScoreOpponent)} (${matchScoreHome}-${matchScoreOpponent})`,
         scores,
       });
       await reload();
@@ -1487,15 +1495,12 @@ export default function Body({
             </div>
 
             <div className="form-group">
-              <label>Match Outcome</label>
-              <select
-                value={matchOutcome}
-                onChange={(e) => setMatchOutcome(e.target.value)}
-              >
-                <option value="Won">Won</option>
-                <option value="Drawn">Drawn</option>
-                <option value="Lost">Lost</option>
-              </select>
+              <label>Match Outcome (automatic)</label>
+              <input
+                type="text"
+                value={outcomeFromScore(matchScoreHome, matchScoreOpponent)}
+                readOnly
+              />
             </div>
           </div>
 

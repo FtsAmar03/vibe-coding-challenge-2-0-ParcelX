@@ -431,7 +431,7 @@ export default function Players({
 
             {filteredPlayers.length === 0 && (
               <tr>
-                <td colSpan="7">
+                <td colSpan="8">
                   <div className="empty-table-state">
                     <p className="empty-title">
                       No players found matching your criteria

@@ -5,6 +5,35 @@ import { authMiddleware } from "../middleware/authMiddleware.js";
 import { roleMiddleware } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
+// Player: only the matches they played, showing only their own score line
+router.get(
+  "/mine",
+  authMiddleware,
+  roleMiddleware("player"),
+  async (req, res) => {
+    try {
+      if (!req.user.playerId) return res.json([]);
+
+      const matches = await Match.find({
+        "scores.playerId": req.user.playerId,
+      }).sort({ createdAt: -1 });
+
+      const mine = matches.map((m) => {
+        const obj = m.toJSON();
+        obj.scores = obj.scores.filter(
+          (s) => String(s.playerId) === String(req.user.playerId),
+        );
+        return obj;
+      });
+
+      res.json(mine);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// Everything below is coach only
 router.use(authMiddleware, roleMiddleware("coach"));
 
 // GET all matches
