@@ -63,9 +63,10 @@ function App() {
         const r = await api.getReadyPlayers();
         setPlayers(r.players.map(adaptPlayer));
       } else {
-        const r = await api.getMyRow();
+        const [r, mm] = await Promise.all([api.getMyRow(), api.getMyMatches()]);
         setPlayers([adaptPlayer(r.player)]);
         setSessions(historyToSessions(r.player));
+        setMatches(mm.map(adaptMatch));
       }
       setLoaded(true);
     } catch (e) {

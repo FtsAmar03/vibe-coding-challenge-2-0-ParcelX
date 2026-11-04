@@ -50,12 +50,22 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  register: (name, email, password) =>
+    request("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ name, email, password }),
+    }),
+  signup: (body) =>
+    request("/auth/signup", { method: "POST", body: JSON.stringify(body) }),
+  getSetupStatus: () => request("/auth/status"),
+
   // reads
   getPlayers: () => request("/players"),
   getReadyPlayers: () => request("/players/ready"),
   getMyRow: () => request("/players/me"),
   getSessions: () => request("/sessions"),
   getMatches: () => request("/matches"),
+  getMyMatches: () => request("/matches/mine"),
 
   // writes (used in the next step)
   addPlayer: (body) =>

@@ -47,7 +47,7 @@ export default function Header({ user, onLogout }) {
           </div>
         </div>
 
-        <button type="button" className="btn-secondary" onClick={onLogout}>
+        <button type="button" className="btn-secondary logout-btn" onClick={onLogout} title="Log out">
           Log out
         </button>
       </div>
