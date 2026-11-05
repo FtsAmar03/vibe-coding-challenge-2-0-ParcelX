@@ -13,21 +13,23 @@ export default function Header({ user, onLogout }) {
 
   return (
     <header className="top-header">
-      <div className="brand-section">
-        <div className="brand-logo">
-          <span>LT</span>
+      <div className="header-left">
+        <div className="brand-section">
+          <div className="brand-logo">
+            <span>LT</span>
+          </div>
+          <div className="brand-info">
+            <h1>Lawazia Toto</h1>
+            <p>SPORTS ACADEMY DESK</p>
+          </div>
         </div>
-        <div className="brand-info">
-          <h1>Lawazia Toto</h1>
-          <p>SPORTS ACADEMY DESK</p>
-        </div>
-      </div>
 
-      <div className="academy-location">
-        <span className="location-icon">⌖</span>
-        <div>
-          <p>ACADEMY LOCATION</p>
-          <h4>Dumka, Jharkhand</h4>
+        <div className="academy-location">
+          <span className="location-icon">⌖</span>
+          <div>
+            <p>ACADEMY LOCATION</p>
+            <h4>Dumka, Jharkhand</h4>
+          </div>
         </div>
       </div>
 
@@ -47,7 +49,12 @@ export default function Header({ user, onLogout }) {
           </div>
         </div>
 
-        <button type="button" className="btn-secondary logout-btn" onClick={onLogout} title="Log out">
+        <button
+          type="button"
+          className="btn-secondary logout-btn"
+          onClick={onLogout}
+          title="Log out"
+        >
           Log out
         </button>
       </div>
