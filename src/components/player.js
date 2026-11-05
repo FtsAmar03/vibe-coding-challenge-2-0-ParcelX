@@ -18,7 +18,14 @@ export default function Players({
     sport: "Football",
   });
 
-  const sports = ["Football", "Cricket", "Hockey", "Basketball"];
+  const sports = [
+    "Football",
+    "Cricket",
+    "Hockey",
+    "Basketball",
+    "Badminton",
+    "Tennis",
+  ];
 
   // Find latest session for roll call checking (Check 1)
   const latestSession = sessions[0];
