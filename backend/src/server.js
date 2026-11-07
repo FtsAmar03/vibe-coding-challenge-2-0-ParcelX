@@ -8,28 +8,49 @@ import matchRoutes from "./routes/matchRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import { authMiddleware } from "./middleware/authMiddleware.js";
 import { roleMiddleware } from "./middleware/roleMiddleware.js";
-import dns from "node:dns";
-
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const app = express();
 
-app.use(cors());
+// CORS — allow your Vercel frontend domain + localhost for dev
+const allowedOrigins = [
+  "http://localhost:1234",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL,   // set this in Vercel environment variables
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`CORS blocked: ${origin}`));
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
-// Connect MongoDB Atlas
-connectDB();
+// Connect MongoDB Atlas (cached across serverless invocations)
+let isConnected = false;
+const ensureDB = async () => {
+  if (!isConnected) {
+    await connectDB();
+    isConnected = true;
+  }
+};
 
-app.get(
-  "/api/coach-dashboard",
-  authMiddleware,
-  roleMiddleware("coach"),
-  (req, res) => {
-    res.json({
-      message: "Welcome to Coach Dashboard",
-    });
-  },
-);
+// Run DB connection before every request
+app.use(async (req, res, next) => {
+  try {
+    await ensureDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ message: "Database connection failed" });
+  }
+});
+
 // Health Check
 app.get("/api/health", (req, res) => {
   res.json({
@@ -40,14 +61,35 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Coach dashboard route
+app.get(
+  "/api/coach-dashboard",
+  authMiddleware,
+  roleMiddleware("coach"),
+  (req, res) => {
+    res.json({ message: "Welcome to Coach Dashboard" });
+  }
+);
+
 // Mount Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/players", playerRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/matches", matchRoutes);
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(` Server is running on http://localhost:${PORT}`);
+// 404 fallback
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
 });
+
+// ── LOCAL DEV: start the server normally ──────────────────────────────────
+// On Vercel this block is skipped; Vercel calls the exported `app` directly.
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
+}
+
+// ── VERCEL: export the Express app as the serverless handler ─────────────
+export default app;

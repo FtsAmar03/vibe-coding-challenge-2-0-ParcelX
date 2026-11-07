@@ -1,5 +1,5 @@
 // All talking to the backend happens here.
-const BASE = process.env.API_URL || "http://localhost:5000/api";
+const BASE = process.env.API_URL || "https://vibe-coding-challenge-2-0-parcel-x-five.vercel.app/api";
 
 // ---------- login storage ----------
 export const getToken = () => localStorage.getItem("token");
