@@ -24,21 +24,23 @@ export default function Header({ user, onLogout, onMenuToggle }) {
         <span></span>
       </button>
 
-      <div className="brand-section">
-        <div className="brand-logo">
-          <span>PM</span>
+      <div className="header-left-group">
+        <div className="brand-section">
+          <div className="brand-logo">
+            <span>PM</span>
+          </div>
+          <div className="brand-info">
+            <h1>Play Metrics</h1>
+            <p>SPORTS ACADEMY DESK</p>
+          </div>
         </div>
-        <div className="brand-info">
-          <h1>Play Metrics</h1>
-          <p>SPORTS ACADEMY DESK</p>
-        </div>
-      </div>
 
-      <div className="academy-location">
-        <span className="location-icon">⌖</span>
-        <div>
-          <p>ACADEMY LOCATION</p>
-          <h4>Dumka, Jharkhand</h4>
+        <div className="academy-location">
+          <span className="location-icon">⌖</span>
+          <div>
+            <p>ACADEMY LOCATION</p>
+            <h4>Dumka, Jharkhand</h4>
+          </div>
         </div>
       </div>
 
