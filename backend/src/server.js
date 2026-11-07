@@ -32,11 +32,17 @@ app.use(
 
 app.use(express.json());
 
-// ── Health check — NO DB needed, always works ─────────────────────────────
-// Visit /api/health on Vercel to verify the function is running
-app.get("/api/health", (req, res) => {
+// Log incoming requests for easy debugging in Vercel runtime logs
+app.use((req, res, next) => {
+  console.log(`[${req.method}] ${req.url}`);
+  next();
+});
+
+// ── Root & Health check — NO DB needed, always works ──────────────────────
+const healthHandler = (req, res) => {
   res.json({
     status: "ok",
+    message: "Dumka Sports Academy API is running live",
     academy: "Dumka Sports Academy",
     env: {
       hasMongoUri: !!process.env.MONGO_URI,
@@ -45,7 +51,11 @@ app.get("/api/health", (req, res) => {
     },
     timestamp: new Date().toISOString(),
   });
-});
+};
+
+app.get("/", healthHandler);
+app.get("/health", healthHandler);
+app.get("/api/health", healthHandler);
 
 // ── DB connection middleware — runs before all API routes ─────────────────
 app.use(async (req, res, next) => {
@@ -62,24 +72,40 @@ app.use(async (req, res, next) => {
 });
 
 // Coach dashboard route
-app.get(
-  "/api/coach-dashboard",
-  authMiddleware,
-  roleMiddleware("coach"),
-  (req, res) => {
-    res.json({ message: "Welcome to Coach Dashboard" });
-  }
-);
+const coachHandler = (req, res) => {
+  res.json({ message: "Welcome to Coach Dashboard" });
+};
+app.get("/api/coach-dashboard", authMiddleware, roleMiddleware("coach"), coachHandler);
+app.get("/coach-dashboard", authMiddleware, roleMiddleware("coach"), coachHandler);
 
-// Mount Routes
+// Mount Routes (support both /api/* and root paths /*)
 app.use("/api/auth", authRoutes);
+app.use("/auth", authRoutes);
+
 app.use("/api/players", playerRoutes);
+app.use("/players", playerRoutes);
+
 app.use("/api/sessions", sessionRoutes);
+app.use("/sessions", sessionRoutes);
+
 app.use("/api/matches", matchRoutes);
+app.use("/matches", matchRoutes);
 
 // 404 fallback
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
+  res.status(404).json({
+    message: "Route not found",
+    requestedPath: req.url,
+    availableRoutes: [
+      "/api/health",
+      "/api/auth/login",
+      "/api/auth/register",
+      "/api/auth/status",
+      "/api/players",
+      "/api/sessions",
+      "/api/matches",
+    ],
+  });
 });
 
 // ── LOCAL DEV: start the server normally ─────────────────────────────────
