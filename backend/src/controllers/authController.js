@@ -86,16 +86,6 @@ export const signup = async (req, res) => {
       return res.status(409).json({ message: "Email already exists" });
     }
 
-    // Only one coach and one scout can sign up
-    if (role === "coach" || role === "scout") {
-      const existingRole = await User.findOne({ role });
-      if (existingRole) {
-        return res.status(403).json({
-          message: `${role === "coach" ? "Coach" : "Scout"} account is already registered`,
-        });
-      }
-    }
-
     // A player must already be on the roster the coach built
     let playerId = null;
     if (role === "player") {

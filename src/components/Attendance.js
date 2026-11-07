@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { api } from "../api";
+import { SPORTS, SPORT_ICONS } from "../constants";
 
 export default function Attendance({ players, sessions, reload }) {
   const [showForm, setShowForm] = useState(false);
@@ -7,11 +8,9 @@ export default function Attendance({ players, sessions, reload }) {
 
   const [date, setDate] = useState(new Date().toLocaleDateString("en-CA"));
 
-  const [sport, setSport] = useState(
-    players.length > 0 ? players[0].sport : "Football",
-  );
+  const [sport, setSport] = useState(SPORTS[0]);
 
-  const sports = [...new Set(players.map((player) => player.sport))];
+  const sports = SPORTS;
 
   const [activeSessionId, setActiveSessionId] = useState(
     sessions.length > 0 ? sessions[0].id : null,
@@ -300,11 +299,7 @@ export default function Attendance({ players, sessions, reload }) {
                   >
                     <div className="session-item-left">
                       <div className="session-sport-icon">
-                        {session.sport === "Football"
-                          ? "⚽"
-                          : session.sport === "Cricket"
-                            ? "🏏"
-                            : "🏑"}
+                        {SPORT_ICONS[session.sport] || "🏅"}
                       </div>
                       <div>
                         <strong>{session.sport} Session</strong>

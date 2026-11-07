@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { api } from "../api";
+import { SPORTS } from "../constants";
 
 // Won / Drawn / Lost is worked out from the two scores
 function outcomeFromScore(home, away) {
@@ -1058,7 +1059,7 @@ export default function Body({
 
             <div className="discipline-bar-row">
               <div className="discipline-bar-labels">
-                <span>⚽ Football Squad</span>
+                <span>⚽ Latest Session Turnout</span>
                 <strong>{activeTurnoutRate}%</strong>
               </div>
               <div className="discipline-track">
@@ -1395,10 +1396,11 @@ export default function Body({
                   value={quickPlayerSport}
                   onChange={(e) => setQuickPlayerSport(e.target.value)}
                 >
-                  <option value="Football">Football</option>
-                  <option value="Cricket">Cricket</option>
-                  <option value="Hockey">Hockey</option>
-                  <option value="Basketball">Basketball</option>
+                  {SPORTS.map((sp) => (
+                    <option key={sp} value={sp}>
+                      {sp}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -1475,9 +1477,11 @@ export default function Body({
                 value={matchSport}
                 onChange={(e) => setMatchSport(e.target.value)}
               >
-                <option value="Football">Football</option>
-                <option value="Cricket">Cricket</option>
-                <option value="Hockey">Hockey</option>
+                {SPORTS.map((sp) => (
+                  <option key={sp} value={sp}>
+                    {sp}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
