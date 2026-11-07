@@ -15,7 +15,8 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:1234",
   "http://localhost:3000",
-  process.env.FRONTEND_URL,   // set this in Vercel environment variables
+  "https://vibe-coding-challenge-2-0-parcel-x-five.vercel.app",
+  process.env.FRONTEND_URL,   // optional override via Vercel env var
 ].filter(Boolean);
 
 app.use(
