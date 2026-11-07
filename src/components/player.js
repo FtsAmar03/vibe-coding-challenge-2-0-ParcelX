@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { api } from "../api";
+import { SPORTS } from "../constants";
 
 export default function Players({
   players,
@@ -18,7 +19,7 @@ export default function Players({
     sport: "Football",
   });
 
-  const sports = ["Football", "Cricket", "Hockey", "Basketball"];
+  const sports = SPORTS;
 
   // Find latest session for roll call checking (Check 1)
   const latestSession = sessions[0];
@@ -431,7 +432,7 @@ export default function Players({
 
             {filteredPlayers.length === 0 && (
               <tr>
-                <td colSpan="8">
+                <td colSpan="7">
                   <div className="empty-table-state">
                     <p className="empty-title">
                       No players found matching your criteria

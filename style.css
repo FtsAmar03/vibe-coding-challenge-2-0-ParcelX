@@ -134,6 +134,12 @@ main.attendance-page {
   box-shadow: 0 4px 20px rgba(10, 25, 32, 0.16);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
 .brand-section {
   display: flex;
   align-items: center;

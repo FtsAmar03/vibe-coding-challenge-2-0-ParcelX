@@ -58,7 +58,12 @@ export default function Header({ user, onLogout, onMenuToggle }) {
           </div>
         </div>
 
-        <button type="button" className="btn-secondary logout-btn" onClick={onLogout} title="Log out">
+        <button
+          type="button"
+          className="btn-secondary logout-btn"
+          onClick={onLogout}
+          title="Log out"
+        >
           Log out
         </button>
       </div>

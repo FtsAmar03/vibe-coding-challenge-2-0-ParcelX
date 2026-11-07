@@ -1,14 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { api, saveSession } from "../api";
 
-const SPORTS = ["Football", "Cricket", "Hockey", "Basketball"];
+import { SPORTS } from "../constants";
 
 export default function Login({ onLogin }) {
   const [mode, setMode] = useState("login"); // "login" or "signup"
-  const [status, setStatus] = useState({
-    coachRegistered: false,
-    scoutRegistered: false,
-  });
 
   const [role, setRole] = useState("player");
   const [name, setName] = useState("");
@@ -20,32 +16,22 @@ export default function Login({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
-
-  // Which one-time accounts (coach, scout) are already taken
-  useEffect(() => {
-    api
-      .getSetupStatus()
-      .then((r) => setStatus(r))
-      .catch(() => {});
-  }, []);
-
-  const roleTaken = (r) =>
-    (r === "coach" && status.coachRegistered) ||
-    (r === "scout" && status.scoutRegistered);
 
   function switchMode(next) {
     setMode(next);
     setError("");
+    setSuccess("");
     setPassword("");
     setConfirm("");
-    if (next === "signup" && roleTaken(role)) setRole("player");
   }
 
   async function handleLogin(e) {
     e.preventDefault();
     setBusy(true);
     setError("");
+    setSuccess("");
     try {
       const data = await api.login(email, password);
       saveSession(data.token, data.user);
@@ -80,19 +66,15 @@ export default function Login({ onLogin }) {
 
       await api.signup(body);
 
-      // Account created, log in straight away
-      const data = await api.login(email, password);
-      saveSession(data.token, data.user);
-      onLogin(data.user);
+      // Account created: go to the login page (email stays filled in)
+      setMode("login");
+      setPassword("");
+      setConfirm("");
+      setName("");
+      setAge("");
+      setSuccess("Account created successfully. Please sign in.");
     } catch (err) {
       setError(err.message || "Signup failed");
-      if (err.status === 403) {
-        setStatus((s) => ({
-          ...s,
-          coachRegistered: s.coachRegistered || role === "coach",
-          scoutRegistered: s.scoutRegistered || role === "scout",
-        }));
-      }
     } finally {
       setBusy(false);
     }
@@ -142,6 +124,27 @@ export default function Login({ onLogin }) {
               </p>
             </div>
 
+            {/* Success Message */}
+            {success && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "12px 14px",
+                  marginBottom: "14px",
+                  borderRadius: "10px",
+                  background: "#e8f7ee",
+                  border: "1px solid #9fd8b4",
+                  color: "#1b6b3a",
+                  fontSize: "14px",
+                }}
+              >
+                <span>✅</span>
+                <span>{success}</span>
+              </div>
+            )}
+
             {/* Error Message */}
             {error && (
               <div className="auth-error-banner">
@@ -157,16 +160,14 @@ export default function Login({ onLogin }) {
                   <label className="auth-label">SELECT YOUR ACADEMY ROLE</label>
                   <div className="auth-role-grid">
                     {roles.map((r) => {
-                      const taken = roleTaken(r.id);
                       const isSelected = role === r.id;
                       return (
                         <button
                           key={r.id}
                           type="button"
-                          disabled={taken}
                           className={`auth-role-card ${
                             isSelected ? "selected" : ""
-                          } ${taken ? "taken" : ""}`}
+                          }`}
                           onClick={() => {
                             setRole(r.id);
                             setError("");
@@ -174,24 +175,14 @@ export default function Login({ onLogin }) {
                         >
                           <span className="role-card-icon">{r.icon}</span>
                           <strong className="role-card-title">{r.label}</strong>
-                          <span className="role-card-desc">
-                            {taken ? "Claimed" : r.desc}
-                          </span>
-                          {isSelected && !taken && (
+                          <span className="role-card-desc">{r.desc}</span>
+                          {isSelected && (
                             <span className="role-card-check">✓</span>
                           )}
                         </button>
                       );
                     })}
                   </div>
-                  {(status.coachRegistered || status.scoutRegistered) && (
-                    <p className="auth-role-notice">
-                      {status.coachRegistered &&
-                        "Head Coach account is already claimed. "}
-                      {status.scoutRegistered &&
-                        "Scout account is already claimed."}
-                    </p>
-                  )}
                 </div>
 
                 {/* Player Notice */}

@@ -1,5 +1,4 @@
 import express from "express";
-import User from "../models/User.js";
 
 import {
   registerCoach,
@@ -15,11 +14,8 @@ const router = express.Router();
 // Tells the frontend whether the coach account already exists
 router.get("/status", async (req, res) => {
   try {
-    const [coach, scout] = await Promise.all([
-      User.exists({ role: "coach" }),
-      User.exists({ role: "scout" }),
-    ]);
-    res.json({ coachRegistered: !!coach, scoutRegistered: !!scout });
+    // Any number of coaches and scouts can sign up, so nothing is ever "claimed"
+    res.json({ coachRegistered: false, scoutRegistered: false });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
