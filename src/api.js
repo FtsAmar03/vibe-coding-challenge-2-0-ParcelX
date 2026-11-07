@@ -1,5 +1,7 @@
 // All talking to the backend happens here.
-const BASE = process.env.API_URL || "https://parcelx-backend-alpha.vercel.app/api";
+const BASE =
+  process.env.API_URL ||
+  "https://vibe-coding-challenge-2-0-parcel-x-mu.vercel.app/api";
 
 // ---------- login storage ----------
 export const getToken = () => localStorage.getItem("token");

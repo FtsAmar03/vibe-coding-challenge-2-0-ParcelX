@@ -11,22 +11,13 @@ import { roleMiddleware } from "./middleware/roleMiddleware.js";
 
 const app = express();
 
-// CORS — allow your Vercel frontend domain + localhost for dev
-const allowedOrigins = [
-  "http://localhost:1234",
-  "http://localhost:3000",
-  "https://vibe-coding-challenge-2-0-parcel-x-five.vercel.app",
-  process.env.FRONTEND_URL,
-].filter(Boolean);
-
+// CORS — allow all frontend domains (localhost, Vercel production & preview URLs)
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`CORS blocked: ${origin}`));
-    },
+    origin: true, // Dynamically allows the requesting origin
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
