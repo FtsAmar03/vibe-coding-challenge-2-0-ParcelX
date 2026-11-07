@@ -16,13 +16,12 @@ const allowedOrigins = [
   "http://localhost:1234",
   "http://localhost:3000",
   "https://vibe-coding-challenge-2-0-parcel-x-five.vercel.app",
-  process.env.FRONTEND_URL,   // optional override via Vercel env var
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, Postman)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
       return callback(new Error(`CORS blocked: ${origin}`));
@@ -33,33 +32,33 @@ app.use(
 
 app.use(express.json());
 
-// Connect MongoDB Atlas (cached across serverless invocations)
-let isConnected = false;
-const ensureDB = async () => {
-  if (!isConnected) {
-    await connectDB();
-    isConnected = true;
-  }
-};
-
-// Run DB connection before every request
-app.use(async (req, res, next) => {
-  try {
-    await ensureDB();
-    next();
-  } catch (err) {
-    res.status(500).json({ message: "Database connection failed" });
-  }
-});
-
-// Health Check
+// ── Health check — NO DB needed, always works ─────────────────────────────
+// Visit /api/health on Vercel to verify the function is running
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
     academy: "Dumka Sports Academy",
-    desk: "Active",
+    env: {
+      hasMongoUri: !!process.env.MONGO_URI,
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      nodeEnv: process.env.NODE_ENV || "not set",
+    },
     timestamp: new Date().toISOString(),
   });
+});
+
+// ── DB connection middleware — runs before all API routes ─────────────────
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("DB middleware error:", err.message);
+    res.status(500).json({
+      message: "Database connection failed",
+      detail: err.message,           // shows exact MongoDB error in response
+    });
+  }
 });
 
 // Coach dashboard route
@@ -83,8 +82,7 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// ── LOCAL DEV: start the server normally ──────────────────────────────────
-// On Vercel this block is skipped; Vercel calls the exported `app` directly.
+// ── LOCAL DEV: start the server normally ─────────────────────────────────
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
