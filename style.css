@@ -139,6 +139,12 @@ main.attendance-page {
   align-items: center;
   gap: 20px;
 }
+
+.header-left-group {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
 
 .brand-section {
   display: flex;
