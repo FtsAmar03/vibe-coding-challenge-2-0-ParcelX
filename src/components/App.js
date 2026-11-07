@@ -27,6 +27,7 @@ function App() {
   const [activePage, setActivePage] = useState("dashboard");
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const role = user ? user.role : null;
 
@@ -146,16 +147,29 @@ function App() {
     );
   }
 
+  // Close sidebar when a page is selected on mobile
+  const handleSetActivePage = (page) => {
+    setActivePage(page);
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="app-container">
-      <Header user={user} onLogout={logout} />
+      <Header user={user} onLogout={logout} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+
+      {/* Dark overlay behind sidebar on mobile */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
 
       <div className="app-layout">
         <Sidebar
           activePage={activePage}
-          setActivePage={setActivePage}
+          setActivePage={handleSetActivePage}
           stats={sidebarStats}
           currentRole={role}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
         <div className="page-content">{renderPage()}</div>
       </div>

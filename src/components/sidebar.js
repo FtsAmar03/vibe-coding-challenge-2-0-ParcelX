@@ -9,7 +9,7 @@ const allMenuItems = [
   { id: "ready", label: "Ready Players", icon: "★" }
 ];
 
-export default function Sidebar({ activePage, setActivePage, stats = {}, currentRole = "coach" }) {
+export default function Sidebar({ activePage, setActivePage, stats = {}, currentRole = "coach", isOpen, onClose }) {
   let menuItems = allMenuItems;
 
   if (currentRole === "scout") {
@@ -23,7 +23,12 @@ export default function Sidebar({ activePage, setActivePage, stats = {}, current
   }
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? " sidebar-open" : ""}`}>
+      {/* Close button — only visible on mobile */}
+      <button className="sidebar-close-btn" onClick={onClose} aria-label="Close menu">
+        ✕
+      </button>
+
       {/* Academy label */}
       <div className="sidebar-heading">
         <p>{currentRole === "scout" ? "SCOUT PORTAL" : currentRole === "player" ? "ATHLETE PORTAL" : "MAIN MENU"}</p>

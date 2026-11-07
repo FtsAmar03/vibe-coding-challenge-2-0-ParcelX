@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function Header({ user, onLogout }) {
+export default function Header({ user, onLogout, onMenuToggle }) {
   const role = user ? user.role : "";
   const title =
     role === "coach"
@@ -13,23 +13,32 @@ export default function Header({ user, onLogout }) {
 
   return (
     <header className="top-header">
-      <div className="header-left">
-        <div className="brand-section">
-          <div className="brand-logo">
-            <span>LT</span>
-          </div>
-          <div className="brand-info">
-            <h1>Lawazia Toto</h1>
-            <p>SPORTS ACADEMY DESK</p>
-          </div>
-        </div>
+      {/* Hamburger button — only visible on mobile */}
+      <button
+        className="hamburger-btn"
+        onClick={onMenuToggle}
+        aria-label="Toggle navigation menu"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
 
-        <div className="academy-location">
-          <span className="location-icon">⌖</span>
-          <div>
-            <p>ACADEMY LOCATION</p>
-            <h4>Dumka, Jharkhand</h4>
-          </div>
+      <div className="brand-section">
+        <div className="brand-logo">
+          <span>PM</span>
+        </div>
+        <div className="brand-info">
+          <h1>Play Metrics</h1>
+          <p>SPORTS ACADEMY DESK</p>
+        </div>
+      </div>
+
+      <div className="academy-location">
+        <span className="location-icon">⌖</span>
+        <div>
+          <p>ACADEMY LOCATION</p>
+          <h4>Dumka, Jharkhand</h4>
         </div>
       </div>
 
