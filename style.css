@@ -4695,3 +4695,205 @@ footer {
   }
 }
 
+
+
+/* ==========================================================================
+   HAMBURGER BUTTON (Three-dash / ☰ menu)
+   Hidden on desktop, visible only on mobile screens
+   ========================================================================== */
+.hamburger-btn {
+  display: none;                   /* hidden by default on desktop */
+  flex-direction: column;
+  justify-content: space-between;
+  width: 36px;
+  height: 36px;
+  padding: 8px 7px;
+  background: var(--navy-surface);
+  border: 1px solid var(--navy-border);
+  border-radius: 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+  gap: 0;
+}
+
+.hamburger-btn span {
+  display: block;
+  width: 100%;
+  height: 2.5px;
+  background: var(--lime);
+  border-radius: 2px;
+  transition: var(--transition-fast);
+}
+
+.hamburger-btn:hover {
+  background: var(--navy-elevated);
+  border-color: var(--lime);
+}
+
+/* ==========================================================================
+   SIDEBAR CLOSE BUTTON (X inside drawer on mobile)
+   ========================================================================== */
+.sidebar-close-btn {
+  display: none;                   /* hidden on desktop */
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--navy-border);
+  background: var(--navy-elevated);
+  color: var(--lime);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+  z-index: 10;
+}
+
+.sidebar-close-btn:hover {
+  background: var(--navy-border);
+}
+
+/* ==========================================================================
+   DARK OVERLAY — behind the sidebar drawer on mobile
+   ========================================================================== */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 299;
+  backdrop-filter: blur(2px);
+  animation: fadeInOverlay 0.22s ease;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINT — Tablet & Mobile (≤ 768px)
+   Sidebar becomes a slide-in drawer triggered by the hamburger button
+   ========================================================================== */
+@media (max-width: 768px) {
+
+  /* Show hamburger button */
+  .hamburger-btn {
+    display: flex;
+  }
+
+  /* Show overlay when sidebar is open */
+  .sidebar-overlay {
+    display: block;
+  }
+
+  /* ── Sidebar: hidden off-screen to the left by default ── */
+  .sidebar {
+    position: fixed;
+    top: 0 !important;              /* override the old rule that set top: 64px */
+    left: 0;
+    height: 100vh !important;      /* full viewport height from top */
+    width: 280px;
+    min-width: 280px;
+    z-index: 300;
+    transform: translateX(-100%);   /* slide off-screen */
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 60px 18px 24px;        /* top padding gives room for ✕ button */
+    box-shadow: none;
+    overflow-y: auto;               /* scroll if content is taller than screen */
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Sidebar: slides in when .sidebar-open class is added ── */
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 40px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Fix sidebar-academy: on mobile don't push to bottom, flow naturally */
+  .sidebar .sidebar-academy {
+    margin-top: 24px;
+  }
+
+  /* Make sure the nav shows ALL items — no clipping */
+  .sidebar .sidebar-nav {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sidebar .sidebar-item {
+    display: flex !important;       /* ensure no item is hidden */
+    padding: 14px 16px;
+  }
+
+  /* Show close button inside drawer */
+  .sidebar-close-btn {
+    display: flex;
+  }
+
+  /* Header: tighten up spacing */
+  .top-header {
+    padding: 0 16px;
+    min-height: 64px;
+    gap: 12px;
+  }
+
+  /* Hide the location chip to save header space */
+  .academy-location {
+    display: none;
+  }
+
+  /* Shrink profile info on small screens */
+  .profile-info {
+    display: none;
+  }
+
+  /* Main layout: full width when sidebar is hidden */
+  .app-layout {
+    min-height: calc(100vh - 64px);
+  }
+
+  /* Page content takes full width */
+  .page-content {
+    width: 100%;
+  }
+
+  /* Adjust main padding on mobile */
+  main.dashboard,
+  main.players-page,
+  main.attendance-page {
+    padding: 20px 16px 40px;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINT — Small Mobile (≤ 480px)
+   ========================================================================== */
+@media (max-width: 480px) {
+
+  .top-header {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .brand-info p {
+    display: none;    /* hide the small subtitle text */
+  }
+
+  .role-badge {
+    padding: 5px 10px;
+    font-size: 10px;
+  }
+
+  .sidebar {
+    width: 100%;       /* full-width drawer on very small phones */
+    min-width: unset;
+  }
+}

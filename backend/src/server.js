@@ -8,6 +8,9 @@ import matchRoutes from "./routes/matchRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import { authMiddleware } from "./middleware/authMiddleware.js";
 import { roleMiddleware } from "./middleware/roleMiddleware.js";
+import dns from "node:dns";
+
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const app = express();
 
