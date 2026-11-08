@@ -1869,6 +1869,17 @@ main.attendance-page {
 /* ==========================================================================
    READY PLAYERS SCOUTING VIEW
    ========================================================================== */
+.ready-header-box.card {
+  margin-bottom: 28px;
+  background: white;
+}
+
+.ready-header-box.card:hover {
+  transform: none;
+  box-shadow: var(--shadow-card);
+  border-color: var(--border);
+}
+
 .readiness-filter-summary {
   display: flex;
   align-items: center;

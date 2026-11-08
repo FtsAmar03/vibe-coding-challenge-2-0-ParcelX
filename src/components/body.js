@@ -465,18 +465,7 @@ export default function Body({
 
     return (
       <main className="dashboard ready-page-view">
-        {/* Check 4 Scout Verification Banner */}
-        <div className="check-info-banner scout-view-banner">
-          <div className="check-badge">CHECK 4: SCOUT FILTER ACTIVE</div>
-          <div className="check-text">
-            <strong>Talent Scout Portal:</strong> Per hackathon requirements,
-            the scout sees <strong>ONLY the Ready players</strong>. Athletes
-            under 75% attendance or with less than 2 matches are automatically
-            filtered out.
-          </div>
-        </div>
-
-        <div className="page-heading">
+        <div className="card page-heading ready-header-box">
           <div>
             <h2>Qualified Match-Ready Talent</h2>
             <p>
@@ -489,25 +478,6 @@ export default function Body({
             <span className="readiness-badge-large">
               ★ {readyPlayers.length} Match-Ready Athletes
             </span>
-          </div>
-        </div>
-
-        {/* Readiness Benchmark Threshold Card */}
-        <div className="readiness-benchmark-card">
-          <div className="benchmark-icon">🎯</div>
-          <div className="benchmark-info">
-            <h4>Check 3 Qualification Benchmark Formula</h4>
-            <p>
-              Selection threshold:{" "}
-              <strong>
-                Attendance = (Present sessions ÷ Sessions held) ≥ 75%
-              </strong>
-              , and <strong>Matches played ≥ 2</strong>.
-            </p>
-          </div>
-          <div className="benchmark-stat">
-            <span className="benchmark-percent">{readyPlayers.length}</span>
-            <small>READY FOR TRIALS</small>
           </div>
         </div>
 
@@ -671,19 +641,6 @@ export default function Body({
   if (activePage === "matches") {
     return (
       <main className="dashboard matches-page-view">
-        {/* Check 2 Info Banner */}
-        <div className="check-info-banner match-check-banner">
-          <div className="check-badge">CHECK 2 ENFORCED</div>
-          <div className="check-text">
-            <strong>Matchday Attendance Rule:</strong> A match on the same day
-            scores the players who were present in practice.{" "}
-            <strong>
-              A player absent from practice that day is refused from the match
-              sheet.
-            </strong>
-          </div>
-        </div>
-
         <div className="page-heading">
           <div>
             <h2>Match Schedule & Verified Sheets</h2>

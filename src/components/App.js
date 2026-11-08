@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "./header";
 import Sidebar from "./sidebar";
@@ -19,20 +19,47 @@ import {
   fillSession,
 } from "../api";
 
+const VALID_COACH_PAGES = ["dashboard", "players", "attendance", "matches", "ready"];
+
+function getInitialPage(role) {
+  try {
+    const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "").toLowerCase() : "";
+    const saved = (typeof window !== "undefined" && window.localStorage.getItem("activePage")) || "";
+    const target = hash || saved;
+
+    if (role === "scout") return "ready";
+    if (role === "player") return "dashboard";
+    if (role === "coach") {
+      return VALID_COACH_PAGES.includes(target) ? target : "dashboard";
+    }
+    return target || "dashboard";
+  } catch (e) {
+    return role === "scout" ? "ready" : "dashboard";
+  }
+}
+
 function App() {
   const [user, setUser] = useState(() => (getToken() ? getUser() : null));
   const [players, setPlayers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [matches, setMatches] = useState([]);
-  const [activePage, setActivePage] = useState("dashboard");
+  const role = user ? user.role : null;
+
+  const [activePage, setActivePage] = useState(() => getInitialPage(role));
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const role = user ? user.role : null;
+  const prevRoleRef = useRef(role);
 
   const logout = useCallback(() => {
     clearSession();
+    try {
+      localStorage.removeItem("activePage");
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    } catch (e) {}
     setUser(null);
     setPlayers([]);
     setSessions([]);
@@ -41,9 +68,47 @@ function App() {
     setError("");
   }, []);
 
-  // Land on the right page for each role
+  // Sync activePage to localStorage and browser URL hash
   useEffect(() => {
-    setActivePage(role === "scout" ? "ready" : "dashboard");
+    if (activePage) {
+      try {
+        localStorage.setItem("activePage", activePage);
+        if (window.location.hash !== `#${activePage}`) {
+          window.location.hash = activePage;
+        }
+      } catch (e) {}
+    }
+  }, [activePage]);
+
+  // Support browser Back/Forward navigation
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace("#", "").toLowerCase();
+      if (hash && hash !== activePage) {
+        if (role === "coach" && VALID_COACH_PAGES.includes(hash)) {
+          setActivePage(hash);
+        } else if (role === "scout" && hash === "ready") {
+          setActivePage("ready");
+        } else if (role === "player" && hash === "dashboard") {
+          setActivePage("dashboard");
+        }
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [activePage, role]);
+
+  // Only reset landing page when role actually changes (e.g. login or switch role)
+  useEffect(() => {
+    if (prevRoleRef.current !== role) {
+      prevRoleRef.current = role;
+      const defaultPage = role === "scout" ? "ready" : "dashboard";
+      setActivePage(defaultPage);
+      try {
+        localStorage.setItem("activePage", defaultPage);
+        window.location.hash = defaultPage;
+      } catch (e) {}
+    }
   }, [role]);
 
   // Load data from the backend, depending on who is logged in
